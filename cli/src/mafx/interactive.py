@@ -9,13 +9,21 @@ from pathlib import Path
 from typing import Any
 
 from maf_labs_host.runner import Runner
-from prompt_toolkit import PromptSession
+from prompt_toolkit.application import Application, get_app
 from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.filters import has_completions
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.layout import ConditionalContainer, HSplit, Layout, Window
+from prompt_toolkit.layout.controls import FormattedTextControl
+from prompt_toolkit.layout.dimension import Dimension
+from prompt_toolkit.layout.menus import CompletionsMenuControl
 from prompt_toolkit.styles import Style
+from prompt_toolkit.widgets import Frame, TextArea
+from prompt_toolkit.widgets.base import Border
+from rich import box
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
@@ -37,29 +45,99 @@ COMMANDS = {
 STYLE = Style.from_dict(
     {
         "prompt": "ansicyan bold",
-        "frame": "ansibrightblack",
-        "bottom-toolbar": "noreverse ansibrightblack",
+        "frame.border": "ansibrightblack",
+        "toolbar": "ansibrightblack",
+        "toolbar.key": "ansibrightblack bold",
+        "completion-menu": "bg:ansibrightblack ansiwhite",
+        "completion-menu.completion.current": "bg:ansicyan ansiblack",
     }
 )
 
+# Bare words people type by habit; treated as the slash command when they are the whole input.
+BARE_COMMANDS = {"exit", "quit", "clear", "help"}
 
-def _bindings() -> KeyBindings:
-    kb = KeyBindings()
 
-    @kb.add("enter")
-    def _submit(event: Any) -> None:
-        buf = event.current_buffer
-        if buf.complete_state and buf.complete_state.current_completion:
-            buf.apply_completion(buf.complete_state.current_completion)
-            return
-        buf.validate_and_handle()
+def _round_frame_corners() -> None:
+    """Match the rounded panels Rich draws for echoed messages."""
+    Border.TOP_LEFT, Border.TOP_RIGHT, Border.BOTTOM_LEFT, Border.BOTTOM_RIGHT = "╭", "╮", "╰", "╯"
 
-    @kb.add("escape", "enter")  # Alt+Enter
-    @kb.add("c-j")  # Ctrl+J (and Shift+Enter in many terminals)
-    def _newline(event: Any) -> None:
-        event.current_buffer.insert_text("\n")
 
-    return kb
+class InputBox:
+    """Inline (non full-screen) input: a framed, growing text area, completion menu and status line.
+
+    The whole widget is drawn and erased by prompt_toolkit, so nothing is left half-drawn in the scrollback;
+    the session echoes the submitted message afterwards as a static panel.
+    """
+
+    def __init__(self, history: FileHistory, toolbar: Any) -> None:
+        self.area = TextArea(
+            prompt=[("class:prompt", " › ")],
+            multiline=True,
+            wrap_lines=True,
+            history=history,
+            completer=WordCompleter(list(COMMANDS), meta_dict=COMMANDS, sentence=True),
+            complete_while_typing=True,
+            dont_extend_height=True,
+            get_line_prefix=lambda line, wrap: "" if line == 0 and wrap == 0 else "   ",
+        )
+        kb = KeyBindings()
+
+        @kb.add("enter")
+        def _submit(event: Any) -> None:
+            buf = self.area.buffer
+            if buf.complete_state and buf.complete_state.current_completion:
+                buf.apply_completion(buf.complete_state.current_completion)
+                return
+            if buf.text.strip():
+                buf.append_to_history()
+            event.app.exit(result=buf.text)
+
+        @kb.add("escape", "enter")  # Alt+Enter
+        @kb.add("c-j")  # Ctrl+J (and Shift+Enter in many terminals)
+        def _newline(event: Any) -> None:
+            self.area.buffer.insert_text("\n")
+
+        @kb.add("c-c")
+        def _cancel(event: Any) -> None:
+            event.app.exit(result="")
+
+        @kb.add("c-d")
+        def _eof(event: Any) -> None:
+            if not self.area.buffer.text:
+                event.app.exit(result=None)
+
+        _round_frame_corners()
+        root = HSplit(
+            [
+                Frame(self.area),
+                # Suggestions open below the box (not drawn over its border).
+                ConditionalContainer(
+                    Window(CompletionsMenuControl(), height=self._menu_height, style="class:completion-menu"),
+                    filter=has_completions,
+                ),
+                Window(FormattedTextControl(toolbar), height=1, style="class:toolbar"),
+            ]
+        )
+        self.app: Application[str | None] = Application(
+            layout=Layout(root, focused_element=self.area),
+            key_bindings=kb,
+            style=STYLE,
+            full_screen=False,
+            erase_when_done=True,
+            mouse_support=False,
+        )
+
+    def _menu_height(self) -> Dimension:
+        state = self.area.buffer.complete_state
+        return Dimension.exact(min(6, max(1, len(state.completions) if state else 1)))
+
+    async def read(self) -> str | None:
+        self.area.buffer.reset()
+        return await self.app.run_async()
+
+
+def _turns(n: int) -> str:
+    return f"{n} turn" if n == 1 else f"{n} turns"
 
 
 class Session:
@@ -73,42 +151,42 @@ class Session:
         self.tokens_out = 0
         history_dir.mkdir(parents=True, exist_ok=True)
         safe = runner.target.replace("/", "__")
-        self.prompt = PromptSession(
-            history=FileHistory(str(history_dir / f"{safe}.history")),
-            completer=WordCompleter(list(COMMANDS), sentence=True),
-            complete_while_typing=True,
-            multiline=True,
-            key_bindings=_bindings(),
-            style=STYLE,
-            bottom_toolbar=self._toolbar,
-            prompt_continuation=lambda width, line, soft: HTML("<frame>│ </frame>"),
-        )
+        self.input = InputBox(FileHistory(str(history_dir / f"{safe}.history")), self._toolbar)
 
-    def _toolbar(self) -> HTML:
+    def _toolbar(self) -> list[tuple[str, str]]:
         info = self.runner.info
-        return HTML(
-            f" <b>{info.get('target')}</b> · {info.get('provider', '?')} · {info.get('model', '?')}"
-            f" · effort {info.get('effort', 'default')}"
-            f" · turns {self.turns} · in {self.tokens_in:,} / out {self.tokens_out:,} tok · view {self.view}"
-            "    <i>⏎ send · Alt+⏎/Ctrl+J newline · / commands · Ctrl+C interrupt · Ctrl+D exit</i>"
+        model = str(info.get("model") or "?").rsplit("/", 1)[-1]
+        status = (
+            f" {model} · effort {info.get('effort', 'default')} · {_turns(self.turns)} · "
+            f"{self.tokens_in:,} in / {self.tokens_out:,} out"
         )
+        hints = [
+            ("class:toolbar.key", "⏎"),
+            ("class:toolbar", " send · "),
+            ("class:toolbar.key", "Alt+⏎"),
+            ("class:toolbar", " newline · "),
+            ("class:toolbar.key", "/help"),
+        ]
+        width = get_app().output.get_size().columns
+        hints_len = sum(len(t) for _, t in hints) + 3
+        if len(status) + hints_len <= width:
+            return [("class:toolbar", status + "   "), *hints]
+        return [("class:toolbar", status)]
 
     async def _read(self) -> str | None:
-        self.console.print(Text("╭" + "─" * (self.console.width - 2) + "╮", style="bright_black"))
-        try:
-            text = await self.prompt.prompt_async(HTML("<frame>│</frame> <prompt>›</prompt> "))
-        except EOFError:
-            return None
-        except KeyboardInterrupt:
-            return ""
-        finally:
-            self.console.print(Text("╰" + "─" * (self.console.width - 2) + "╯", style="bright_black"))
+        text = await self.input.read()
+        if text and text.strip():
+            # Two-column grid so wrapped and multi-line input hangs under the text, not under the "›".
+            echo = Table.grid(padding=(0, 1))
+            echo.add_column(style="bold cyan", no_wrap=True)
+            echo.add_column(overflow="fold")
+            echo.add_row("›", Text(text.strip()))
+            self.console.print(Panel(echo, box=box.ROUNDED, border_style="bright_black", padding=(0, 1)))
         return text
 
     async def _turn(self, text: str) -> None:
         self.last_prompt = text
         renderer = Renderer(self.console, view=self.view)
-        self.console.print()
 
         async def consume() -> None:
             async for e in self.runner.turn(text):
@@ -131,7 +209,6 @@ class Session:
             renderer.finish()
             with contextlib.suppress(NotImplementedError, RuntimeError):
                 loop.remove_signal_handler(signal.SIGINT)
-        self.console.print()
 
     async def _command(self, line: str) -> bool:
         """Handle a slash command. Returns False to exit."""
@@ -186,14 +263,19 @@ class Session:
     async def run(self) -> None:
         print_info(self.console, self.runner.info)
         self.console.print(Text("  /help for commands", style="dim"))
+        self.console.print()
         while True:
             text = await self._read()
             if text is None:
                 return
             if not text.strip():
                 continue
-            if text.strip().startswith("/"):
-                if not await self._command(text):
+            stripped = text.strip()
+            if stripped.lower() in BARE_COMMANDS:
+                stripped = "/" + stripped.lower()
+            if stripped.startswith("/"):
+                if not await self._command(stripped):
                     return
                 continue
             await self._turn(text)
+            self.console.print()
