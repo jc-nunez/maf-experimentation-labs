@@ -11,7 +11,12 @@ Choose one with `--provider` or `MAF_PROVIDER`. The default comes from `defaults
 | `mock` | offline deterministic client | none |
 
 ## SGLang notes
-- **History stays client-side (`store=false`).** The Responses client normally relies on server-side storage (`previous_response_id`), which self-hosted servers usually don't fully support. With `store=false`, the full history is sent on every turn. Set `SGLANG_STORE=true` only if your server supports stored responses.
+- **History stays client-side (`store=false`).** With `store=false`, the full history is sent on every model call. That survives server restarts, and long sessions don't hold memory on the server. SGLang also supports `SGLANG_STORE=true`: the server continues from `previous_response_id` and nothing is replayed. That works too, but sessions are lost when the server restarts.
+- **Earlier reasoning is not replayed.** SGLang returns reasoning items without `encrypted_content`. Agent Framework (Python) refuses to replay reasoning without it ("Stateless replay cannot reconstruct reasoning item(s)…"). So the `sglang` provider strips reasoning from the history it sends (`StripReplayedReasoning` middleware). SGLang doesn't need it, live output and traces still show it, and the session history keeps it.
+- **.NET compatibility fixes** (applied automatically by the `sglang` provider in `MafLabs.Hosting`):
+  - SGLang sends `created_at` as a float. The OpenAI .NET SDK expects an integer and throws `FormatException`, so `SglangCompatPolicy` rewrites these timestamps while the response streams.
+  - The .NET SDK sends `"strict": null` on tool definitions, which SGLang rejects, so the provider sets `strict: false` explicitly.
+- **Debugging:** `MAFX_DEBUG=1` prints full Python tracebacks and .NET stack traces in error events.
 - **Tool calling needs a parser.** SGLang must be started with a tool-call parser that matches the model (`--tool-call-parser …`), and with a reasoning parser if you want reasoning streamed separately. `mafx doctor` warns when the model answers without calling the test tool.
 - **Chat Completions fallback.** If a Responses feature misbehaves, set `SGLANG_API=chat` to tell whether the problem is the model or the API layer.
 

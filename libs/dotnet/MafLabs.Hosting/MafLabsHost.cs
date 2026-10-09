@@ -96,7 +96,7 @@ public sealed class MafLabsHost
             else if (Options.Output == "text" && !Options.Quiet) Plain(e);
         }
         var done = events.LastOrDefault() ?? new JsonObject();
-        if (Options.Output == "text") Console.WriteLine(done["text"]?.GetValue<string>() ?? "");
+        if (Options.Output == "text") Console.WriteLine((done["text"]?.GetValue<string>() ?? "").Trim());
         if (Options.Output == "json")
         {
             var arr = new JsonArray(events.Select(x => (JsonNode)x.DeepClone()).ToArray());
@@ -213,7 +213,8 @@ internal sealed class AgentRunner(AIAgent agent, string name, ProviderInfo provi
             catch (Exception ex)
             {
                 ok = false;
-                events.Add(Events.Create("error", ("message", $"{ex.GetType().Name}: {ex.Message}")));
+                var detail = Env.Get("MAFX_DEBUG") is null ? $"{ex.GetType().Name}: {ex.Message}" : ex.ToString();
+                events.Add(Events.Create("error", ("message", detail)));
                 break;
             }
             foreach (var e in tr.Translate(update)) yield return e;

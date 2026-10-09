@@ -74,3 +74,31 @@ def test_stdio_protocol_round_trip():
     lines = [json.loads(line) for line in proc.stdout.splitlines()]
     assert lines[0]["type"] == "ready" and lines[0]["info"]["target"] == "hello-world/greeter"
     assert lines[-1]["type"] == "turn_completed" and lines[-1]["text"] == "[mock] hi"
+
+
+async def test_sglang_strips_reasoning_from_replayed_history():
+    """SGLang returns reasoning without encrypted_content, so it must not be replayed (it would be rejected)."""
+    from agent_framework import ChatContext, Message
+    from maf_labs_host.providers import StripReplayedReasoning
+
+    history = [
+        Message("user", ["weather?"]),
+        Message(
+            "assistant",
+            [
+                Content.from_text_reasoning(id="rs_1", text="call the tool"),
+                Content.from_function_call(call_id="c1", name="get_weather", arguments="{}"),
+            ],
+        ),
+        Message("tool", [Content.from_function_result(call_id="c1", result="sunny")]),
+    ]
+    context = ChatContext(client=None, messages=history, options=None)
+
+    async def call_next():
+        return None
+
+    await StripReplayedReasoning().process(context, call_next)
+    sent = context.messages
+    assert [c.type for c in sent[1].contents] == ["function_call"]
+    assert sent[0] is history[0] and sent[2] is history[2]
+    assert any(c.type == "text_reasoning" for c in history[1].contents)  # session history untouched

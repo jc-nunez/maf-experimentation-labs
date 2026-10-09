@@ -71,7 +71,7 @@ async def _run_once(runner: Runner, prompt: str, output: str, quiet: bool) -> in
             _plain(e, sys.stderr)
     done = collected[-1] if collected else {}
     if output == "text":
-        print(done.get("text", ""))
+        print(done.get("text", "").strip())
     elif output == "json":
         print(json.dumps({"info": runner.info, "result": done, "events": collected}, default=str, indent=2))
     return 0 if done.get("ok", False) else 1

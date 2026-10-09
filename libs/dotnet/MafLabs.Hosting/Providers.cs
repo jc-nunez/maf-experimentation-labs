@@ -1,4 +1,5 @@
 using System.ClientModel;
+using System.ClientModel.Primitives;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using OpenAI.Responses;
@@ -24,7 +25,7 @@ public static class Providers
             {
                 var baseUrl = Env.Require("SGLANG_BASE_URL", name);
                 var m = model ?? Env.Require("SGLANG_MODEL", name);
-                var client = CreateOpenAIClient(baseUrl, Env.Get("SGLANG_API_KEY", "EMPTY")!);
+                var client = CreateOpenAIClient(baseUrl, Env.Get("SGLANG_API_KEY", "EMPTY")!, sglangCompat: true);
                 var api = (Env.Get("SGLANG_API", "responses") ?? "responses").ToLowerInvariant();
                 if (api == "chat")
                 {
@@ -35,6 +36,11 @@ public static class Providers
                 var chat = store
                     ? client.GetResponsesClient().AsIChatClient(m)
                     : client.GetResponsesClient().AsIChatClientWithStoredOutputDisabled(m, includeReasoningEncryptedContent: false);
+                // SGLang rejects "strict": null on tool definitions, which the OpenAI SDK sends unless strict
+                // mode is set explicitly.
+                chat = chat.AsBuilder()
+                    .ConfigureOptions(o => (o.AdditionalProperties ??= []).TryAdd("strict", false))
+                    .Build();
                 return (chat, new ProviderInfo(name, m, "responses", baseUrl));
             }
 
@@ -65,6 +71,13 @@ public static class Providers
         }
     }
 
-    private static OpenAIClient CreateOpenAIClient(string baseUrl, string apiKey) =>
-        new(new ApiKeyCredential(apiKey), new OpenAIClientOptions { Endpoint = new Uri(baseUrl) });
+    private static OpenAIClient CreateOpenAIClient(string baseUrl, string apiKey, bool sglangCompat = false)
+    {
+        var options = new OpenAIClientOptions { Endpoint = new Uri(baseUrl) };
+        if (sglangCompat)
+        {
+            options.AddPolicy(new SglangCompatPolicy(), PipelinePosition.PerCall);
+        }
+        return new OpenAIClient(new ApiKeyCredential(apiKey), options);
+    }
 }

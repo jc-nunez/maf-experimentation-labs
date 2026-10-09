@@ -10,6 +10,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Any
 
+from agent_framework import GROUP_ANNOTATION_KEY, ChatContext, ChatMiddleware, Message
+
 PROVIDERS = ("sglang", "openai", "azure-openai", "foundry", "mock")
 
 
@@ -26,6 +28,30 @@ class ProviderInfo:
     api: str  # responses | chat | mock | foundry
     base_url: str | None = None
     default_options: dict[str, Any] = field(default_factory=dict)
+
+
+class StripReplayedReasoning(ChatMiddleware):
+    """Remove reasoning from the history sent to the model on each call.
+
+    Only the outgoing request changes: the session keeps its reasoning and live streams still show it.
+    """
+
+    async def process(self, context: ChatContext, call_next: Any) -> None:
+        context.messages = [_without_reasoning(m) for m in context.messages]
+        await call_next()
+
+
+def _without_reasoning(message: Message) -> Message:
+    if not any(c.type == "text_reasoning" for c in message.contents):
+        return message
+    props = {k: v for k, v in (message.additional_properties or {}).items() if k != GROUP_ANNOTATION_KEY}
+    return Message(
+        message.role,
+        [c for c in message.contents if c.type != "text_reasoning"],
+        author_name=message.author_name,
+        message_id=message.message_id,
+        additional_properties=props,
+    )
 
 
 def _env(name: str, default: str | None = None) -> str | None:
@@ -75,11 +101,14 @@ def create_chat_client(provider: str | None = None, model: str | None = None) ->
             return client, ProviderInfo(name, model, "chat", base_url)
         from agent_framework.openai import OpenAIChatClient
 
-        client = OpenAIChatClient(model=model, api_key=api_key, base_url=base_url)
-        # Self-hosted Responses servers rarely support stored responses / previous_response_id, so keep
-        # conversation history client-side unless explicitly enabled.
-        options = {"store": _truthy(_env("SGLANG_STORE", "false"))}
-        return client, ProviderInfo(name, model, "responses", base_url, options)
+        store = _truthy(_env("SGLANG_STORE", "false"))
+        # Default: history stays client-side (store=false). SGLang returns reasoning items without
+        # encrypted_content, which the framework requires to replay them, so earlier reasoning is dropped
+        # from replayed history (SGLang does not need it). With SGLANG_STORE=true the server continues
+        # from previous_response_id instead and nothing is replayed.
+        middleware = [] if store else [StripReplayedReasoning()]
+        client = OpenAIChatClient(model=model, api_key=api_key, base_url=base_url, middleware=middleware)
+        return client, ProviderInfo(name, model, "responses", base_url, {"store": store})
 
     if name == "openai":
         from agent_framework.openai import OpenAIChatClient
