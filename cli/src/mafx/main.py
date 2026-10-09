@@ -312,7 +312,7 @@ def doctor(
         out.print(mark + Text(f" {label:28}") + Text(detail, style="dim"))
 
     row(True, "workspace", str(ws.root))
-    row(True, "python", sys.version.split()[0])
+    row(True, "python", f"{sys.version.split()[0]} ({sys.prefix})")
     row(shutil.which("uv") is not None or None, "uv", shutil.which("uv") or "not found (needed for uv sync)")
     dotnet = shutil.which("dotnet")
     row(dotnet is not None or None, "dotnet", dotnet or "not found (only needed for dotnet components)")
@@ -753,10 +753,42 @@ def infra_status(name: str | None = typer.Argument(None, help="service (default:
     out.print(table)
 
 
+def _use_workspace_environment() -> None:
+    """Re-run under the workspace's .venv when this mafx was installed elsewhere (e.g. `uv tool install`).
+
+    Projects and shared tools are loaded from source, but their dependencies (trafilatura, ddgs, ...) live in the
+    workspace environment that `uv sync --all-packages` maintains. A globally installed mafx therefore hands off
+    to ``<workspace>/.venv/bin/mafx``. Set MAFX_NO_REEXEC=1 to disable.
+    """
+    if os.environ.get("MAFX_NO_REEXEC"):
+        return
+    try:
+        ws = targets.workspace()
+    except WorkspaceNotFound:
+        return
+    venv = ws.root / ".venv"
+    workspace_mafx = venv / ("Scripts/mafx.exe" if os.name == "nt" else "bin/mafx")
+    if Path(sys.prefix).resolve() == venv.resolve():
+        return
+    if not workspace_mafx.exists():
+        err.print(
+            Text(
+                f"note: {venv} has no mafx; run `uv sync --all-packages` in {ws.root} so projects get their "
+                "dependencies (continuing with this install)",
+                style="yellow",
+            )
+        )
+        return
+    os.environ["MAFX_NO_REEXEC"] = "1"  # never loop
+    os.execv(str(workspace_mafx), [str(workspace_mafx), *sys.argv[1:]])
+
+
 def cli() -> None:
     """Console entry point: known errors become one clean line (MAFX_DEBUG=1 shows tracebacks)."""
     import yaml
     from pydantic import ValidationError
+
+    _use_workspace_environment()
 
     try:
         app()

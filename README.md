@@ -28,6 +28,9 @@ docs/                    architecture, manifest, CLI, host protocol, providers, 
 uv sync --all-packages                 # Python 3.10+, installs every workspace package
 cp .env.example .env                   # then set SGLANG_BASE_URL (and the model if different)
 uv tool install --editable ./cli       # optional: `mafx` on your PATH (otherwise prefix with `uv run`)
+                                       # inside the workspace it hands off to .venv/bin/mafx, so every
+                                       # project's dependencies are available (re-run `uv sync --all-packages`
+                                       # after adding dependencies)
 
 mafx infra up searxng                  # optional: local web search for agents (needs Docker)
 mafx doctor                            # toolchain + endpoint check (models, a Responses call, a tool call, web search)
