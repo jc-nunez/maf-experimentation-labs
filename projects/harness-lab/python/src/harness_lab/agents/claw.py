@@ -16,11 +16,12 @@ INSTRUCTIONS = """\
 
 You are a personal finance and investing assistant. You help the user understand their
 watchlist and the markets. When asked about a stock, look up its current price with the
-get_stock_price tool.
+get_stock_price tool, and use web_search / fetch_url for recent news, earnings, or analyst commentary.
 
 ### Working style
 
 - Always verify numbers with a tool rather than relying on memory. Stock prices change.
+- Cite web sources inline when you use them.
 - Keep the user's watchlist in a memory file called watchlist.md: read it when reviewing the
   watchlist, and update it whenever the user adds or removes a ticker.
 - For multi-step requests, plan first: create todos, then switch to execute mode and work through them.
@@ -46,8 +47,9 @@ def create_agent(client, context):
         agent_instructions=INSTRUCTIONS,
         max_context_window_tokens=MAX_CONTEXT_WINDOW_TOKENS,
         max_output_tokens=MAX_OUTPUT_TOKENS,
-        # Hosted web search is an OpenAI/Foundry service tool; SGLang has no equivalent.
-        disable_web_search=context.provider.provider not in ("openai", "azure-openai", "foundry"),
+        # Web search comes from the shared SearXNG tools in project.yaml (works with any model), so the
+        # provider-hosted web search tool stays off.
+        disable_web_search=True,
         # File memory under .mafx/ (gitignored) instead of ./agent-file-memory in whatever cwd mafx runs from.
         file_memory_store=FileSystemAgentFileStore(memory_root),
         # Keep re-invoking while in execute mode with open todos, reminding the agent what is left.

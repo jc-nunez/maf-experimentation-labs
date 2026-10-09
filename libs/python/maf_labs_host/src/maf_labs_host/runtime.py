@@ -32,7 +32,7 @@ class HostContext:
 
     def tools(self, *names: str) -> list[Any]:
         """Build tools declared in the manifest by name (for use inside python factories)."""
-        return [build_tool(self.project.tool(n), self) for n in names]
+        return _flatten(build_tool(self.project.tool(n), self) for n in names)
 
 
 def _ensure_importable(project: Project) -> None:
@@ -96,6 +96,8 @@ def build_tool(spec: ToolSpec, ctx: HostContext | None = None, project: Project 
         obj = import_entry(spec.entry or "", project)
         from agent_framework import FunctionTool, tool
 
+        if isinstance(obj, (list, tuple)):  # a tool pack: one manifest entry, several tools
+            return [t if isinstance(t, FunctionTool) else tool(t) for t in obj]
         return obj if isinstance(obj, FunctionTool) else tool(obj, name=spec.name)
 
     if spec.kind == "mcp":
@@ -151,7 +153,15 @@ def build_agent(spec: AgentSpec, ctx: HostContext) -> Any:
 
 def agent_tools(spec: AgentSpec, ctx: HostContext) -> list[Any]:
     """Tools the manifest attaches to an agent (in addition to those the factory set)."""
-    return [build_tool(ctx.project.tool(name), ctx) for name in spec.tools]
+    return _flatten(build_tool(ctx.project.tool(name), ctx) for name in spec.tools)
+
+
+def _flatten(tools: Any) -> list[Any]:
+    """build_tool returns one tool, or a list for tool packs (an entry pointing at a list of tools)."""
+    out: list[Any] = []
+    for t in tools:
+        out.extend(t if isinstance(t, list) else [t])
+    return out
 
 
 # ----------------------------------------------------------------------------------------- workflows

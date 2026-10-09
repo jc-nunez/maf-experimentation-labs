@@ -518,13 +518,20 @@ def tool_run(
     except ValueError as e:
         _fail(f"--args is not valid JSON: {e}")
 
+    def pick(functions: list[Any]) -> Any:
+        wanted = arguments.pop("_function", None)
+        fn = next((f for f in functions if f.name == wanted), None)
+        if fn is None:
+            names = ", ".join(f.name for f in functions)
+            _fail(f'{ref} has several functions ({names}); choose one with "_function" in --args')
+        return fn
+
     async def go() -> Any:
         if hasattr(built, "__aenter__"):
             async with built:
-                fn = next((f for f in built.functions if f.name == arguments.pop("_function", None)), None)
-                if fn is None:
-                    _fail('MCP tool: pass the server function as "_function" in --args (see `mafx tool inspect`)')
-                return await fn.invoke(arguments=arguments, skip_parsing=True)
+                return await pick(built.functions).invoke(arguments=arguments, skip_parsing=True)
+        if isinstance(built, list):
+            return await pick(built).invoke(arguments=arguments, skip_parsing=True)
         return await built.invoke(arguments=arguments, skip_parsing=True)
 
     try:
@@ -543,7 +550,7 @@ def tool_inspect(ref: str = typer.Argument(..., help="project/tool")) -> None:
         if hasattr(built, "__aenter__"):
             async with built:
                 return [f.to_json_schema_spec() for f in built.functions]
-        return [built.to_json_schema_spec()]
+        return [t.to_json_schema_spec() for t in (built if isinstance(built, list) else [built])]
 
     try:
         schemas = asyncio.run(go())

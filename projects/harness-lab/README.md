@@ -17,9 +17,11 @@ Agents built on the Agent Framework **harness**: `create_harness_agent` (Python)
 
 | Component | Runtime | What it shows |
 |---|---|---|
-| `claw` | python | `create_harness_agent` with the `get_stock_price` tool, file memory, and an execute-mode loop (`todos_remaining`) |
+| `claw` | python | `create_harness_agent` with the `get_stock_price` tool, web tools, file memory, and an execute-mode loop (`todos_remaining`) |
+| `researcher` | python | Port of the official `harness_research.py`: plans research as todos, then searches and reads sources with the web tools |
 | `claw-dotnet` | dotnet | `AsHarnessAgent(new HarnessAgentOptions { … })` with the same instructions and tool |
 | `get-stock-price` | python tool | mock prices (same price book as the official sample) |
+| `web` | shared tool pack | `web_search` (SearXNG) and `fetch_url` (page → markdown), from `tools/python/web-search` |
 
 ```bash
 mafx run harness-lab/claw                       # interactive: plan → todos → execute → memory
@@ -34,7 +36,7 @@ The harness's own tools show up in the trajectory, so you can follow its plannin
 - file memory: `file_memory_write`, `file_memory_read`, …
 
 ## Adaptations for this workspace
-- **Web search is disabled for `sglang`.** The harness's web search is a hosted OpenAI/Foundry tool that SGLang doesn't have. It stays enabled for the `openai`, `azure-openai` and `foundry` providers.
+- **Web search comes from SearXNG, not the provider.** The harness's built-in web search is a hosted OpenAI/Foundry tool that SGLang doesn't have, so it is disabled. The agents use the shared `web` tools instead, which work with any model. Set `SEARXNG_URL` in `.env`. `fetch_url` refuses private, loopback and tailnet addresses, checked both before connecting and on the connected socket.
 - **File memory is stored under `.mafx/memory/harness-lab/<session>/`** (gitignored), not `./agent-file-memory` in the current directory.
 - **Context window:** compaction is sized for Qwen3.8-Flash-Next (262K context, 16K output).
 - **SGLang reasoning replay:** the harness persists history after every model call and tags compacted reasoning groups. The `sglang` provider strips reasoning and those tags at the request layer (`SGLangResponsesClient`); see `docs/providers.md`.

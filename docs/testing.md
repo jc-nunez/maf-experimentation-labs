@@ -33,6 +33,12 @@ mafx run harness-lab/claw -p "My watchlist is MSFT, NVDA and AAPL. Save it, then
 mafx run harness-lab/claw -p "Make a todo per ticker (MSFT, NVDA) to get its price and note it in watchlist.md, then execute without asking."
 mafx run harness-lab/claw-dotnet -p "My watchlist is MSFT and NVDA. Which is cheaper?"
 ls .mafx/memory/harness-lab/              # one folder of memory files per session
+
+# Web search (needs SEARXNG_URL)
+mafx tool inspect harness-lab/web
+mafx tool run harness-lab/web -a '{"_function":"web_search","query":"SGLang responses API","max_results":3}'
+mafx tool run harness-lab/web -a '{"_function":"fetch_url","url":"https://docs.searxng.org/dev/search_api.html"}'
+mafx run harness-lab/researcher -p "Research: what is SearXNG and how do you enable its JSON API? Plan, then execute."
 ```
 
 ## Tools (no model involved)

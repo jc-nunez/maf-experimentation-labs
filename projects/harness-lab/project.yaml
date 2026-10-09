@@ -11,7 +11,13 @@ components:
       description: Personal finance assistant on create_harness_agent (todos, plan/execute modes, file memory, loop)
       runtime: python
       entry: harness_lab.agents.claw:create_agent
-      tools: [get-stock-price]
+      tools: [get-stock-price, web]
+
+    - name: researcher
+      description: Research assistant on create_harness_agent with web search via SearXNG (port of harness_research.py)
+      runtime: python
+      entry: harness_lab.agents.researcher:create_agent
+      tools: [web]
 
     - name: claw-dotnet
       description: Same assistant on the .NET HarnessAgent (AsHarnessAgent)
@@ -24,5 +30,10 @@ components:
       kind: function
       runtime: python
       entry: harness_lab.tools.get_stock_price:get_stock_price
+
+    - name: web
+      description: web_search (SearXNG at SEARXNG_URL) and fetch_url (page -> markdown), shared tool pack
+      kind: ref
+      ref: tools/python/web-search
 
   workflows: []

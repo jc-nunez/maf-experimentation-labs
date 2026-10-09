@@ -1,0 +1,7 @@
+# Shared tool package. Reference it from a project manifest with:
+#   - { name: web, kind: ref, ref: tools/python/web-search }
+# The entry is a list, so one reference attaches both tools (web_search and fetch_url).
+kind: function
+runtime: python
+entry: web_search.tools:TOOLS
+description: Web search via SearXNG (SEARXNG_URL) and page fetching as markdown
