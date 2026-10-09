@@ -47,6 +47,14 @@ def _json(value: Any) -> str:
     return json.dumps(value, indent=2, ensure_ascii=False, default=str)
 
 
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def _visible(text: str) -> str:
+    """Show control characters (e.g. ANSI escapes in tool arguments) instead of letting the terminal run them."""
+    return _CONTROL.sub(lambda m: f"\\x{ord(m.group()):02x}", text)
+
+
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
@@ -187,10 +195,10 @@ class Renderer:
         if not self._blank:
             self._print()
 
-    def _body(self, label: str, value: Any, style: str = "") -> None:
-        text = _json(value)
+    def _body(self, label: str, value: Any, style: str = "", fold: bool = True) -> None:
+        text = _visible(_json(value))
         lines = text.splitlines() or [""]
-        if self.view == "normal" and len(lines) > FOLD_LINES:
+        if fold and self.view == "normal" and len(lines) > FOLD_LINES:
             lines = [*lines[:FOLD_LINES], f"… +{len(lines) - FOLD_LINES} lines (/view full)"]
         body = Text(label, style="dim") + Text("\n".join(lines), style=style)
         self._print(body, indent=BODY)
@@ -325,7 +333,8 @@ class Renderer:
                 + Text(f"{prefix}{e.get('name')}", style="bold yellow")
                 + Text("  needs approval", style="yellow")
             )
-            self._body("args   ", e.get("arguments"))
+            # Never fold or truncate what is being approved, whatever the view.
+            self._body("args   ", e.get("arguments"), fold=False)
         elif t == "approval_decision":
             ok = e.get("decision") != "deny"
             labels = {

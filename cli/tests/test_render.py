@@ -58,3 +58,17 @@ def test_trimmed_markdown_has_no_outer_blank_lines():
     Console(file=out, width=60, color_system=None).print(_Trimmed(Markdown("| a | b |\n|---|---|\n| 1 | 2 |")))
     lines = out.getvalue().splitlines()
     assert lines[0].strip() and lines[-1].strip()
+
+
+def test_approval_requests_show_full_arguments_even_when_folding():
+    content = "\n".join(f"line {i}" for i in range(40))
+    text = render(
+        [{"type": "approval_request", "request_id": "r1", "name": "write", "arguments": {"content": content}}],
+        view="normal",
+    )
+    assert "line 39" in text and "lines (/view full)" not in text
+
+
+def test_control_characters_in_arguments_are_shown_not_executed():
+    text = render([{"type": "approval_request", "request_id": "r1", "name": "write", "arguments": "safe\x1b[2Kspoof"}])
+    assert "\x1b" not in text and "\\x1b" in text

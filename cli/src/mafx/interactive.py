@@ -142,7 +142,10 @@ APPROVAL_KEYS = {"y": "approve", "a": "always", "A": "always_args", "n": "deny"}
 
 
 async def ask_approval(tool: str) -> str:
-    """Single-key approval prompt: y approve · a always (tool) · A always (these args) · n deny. Ctrl+C denies."""
+    """Single-key approval prompt: y approve · a always (tool) · A always (these args) · n deny.
+
+    There is no default: Enter and other keys do nothing, so a stray keypress never approves. Esc / Ctrl+C deny.
+    """
     kb = KeyBindings()
 
     for key, decision in APPROVAL_KEYS.items():
@@ -150,10 +153,6 @@ async def ask_approval(tool: str) -> str:
         @kb.add(key)
         def _choose(event: Any, decision: str = decision) -> None:
             event.app.exit(result=decision)
-
-    @kb.add("enter")
-    def _default(event: Any) -> None:
-        event.app.exit(result="approve")
 
     @kb.add("c-c")
     @kb.add("escape")
@@ -163,7 +162,7 @@ async def ask_approval(tool: str) -> str:
     question = [
         ("class:approval", f"    Allow {tool}? "),
         ("class:toolbar.key", "y"),
-        ("class:toolbar", " yes (⏎) · "),
+        ("class:toolbar", " yes · "),
         ("class:toolbar.key", "a"),
         ("class:toolbar", " always for this tool · "),
         ("class:toolbar.key", "A"),
