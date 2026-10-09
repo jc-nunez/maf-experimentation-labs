@@ -1,0 +1,40 @@
+[project]
+name = "maf-experimentation-labs"
+version = "0.1.0"
+description = "Incubation workspace for Microsoft Agent Framework agents, tools and workflows"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = [
+    "cli",
+    "libs/python/*",
+    "projects/*/python",
+    "tools/python/*",
+]
+
+[tool.uv.sources]
+mafx = { workspace = true }
+maf-labs-host = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = ["live: hits a real model endpoint (needs SGLANG_BASE_URL or other provider config)"]
+addopts = "-m 'not live'"

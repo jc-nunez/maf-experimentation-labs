@@ -1,0 +1,9 @@
+<Project>
+  <!-- One place for NuGet versions (central package management). -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.24.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.24.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
+    <PackageVersion Include="OpenAI" Version="2.14.0" />
+  </ItemGroup>
+</Project>

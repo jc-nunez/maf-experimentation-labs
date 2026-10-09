@@ -1,0 +1,13 @@
+# Workspace marker and defaults for the `mafx` CLI.
+# mafx walks up from the current directory until it finds this file.
+version: 1
+
+defaults:
+  provider: sglang          # sglang | openai | azure-openai | foundry | mock
+  view: full                # full | normal | quiet
+
+paths:
+  projects: projects
+  shared_tools: tools
+  runs: .mafx/runs          # trajectories, eval runs (gitignored)
+  sessions: .mafx/sessions  # saved interactive sessions (gitignored)

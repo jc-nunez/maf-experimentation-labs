@@ -1,0 +1,9 @@
+# Declarative agent (agent-framework-declarative, kind: Prompt).
+# The model/provider comes from the host (--provider / MAF_PROVIDER), so no `model:` block is needed.
+# Tools listed for this agent in project.yaml are attached by the host at run time.
+kind: Prompt
+name: greeter-yaml
+description: Friendly assistant with weather lookup (declarative)
+instructions: |
+  You are a friendly, concise assistant.
+  When the user asks about the weather, call the get_weather tool for each city before answering.
