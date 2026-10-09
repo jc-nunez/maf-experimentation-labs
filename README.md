@@ -17,6 +17,7 @@ projects/<name>/
   declarative/           agents/*.yaml (kind: Prompt), workflows/*.yaml (kind: Workflow)
   dotnet/<Proj>/         .NET project;  dotnet/apps/*.cs  .NET 10 single-file apps
 tools/                   shared tools reusable across projects (python packages, MCP servers)
+infra/                   local supporting services for agents (e.g. SearXNG), run with `mafx infra up`
 docs/                    architecture, manifest, CLI, host protocol, providers, .NET
 .mafx/                   local run data: traces, sessions, history (gitignored)
 ```
@@ -28,7 +29,8 @@ uv sync --all-packages                 # Python 3.10+, installs every workspace 
 cp .env.example .env                   # then set SGLANG_BASE_URL (and the model if different)
 uv tool install --editable ./cli       # optional: `mafx` on your PATH (otherwise prefix with `uv run`)
 
-mafx doctor                            # toolchain + endpoint check (models, a Responses call, a tool call)
+mafx infra up searxng                  # optional: local web search for agents (needs Docker)
+mafx doctor                            # toolchain + endpoint check (models, a Responses call, a tool call, web search)
 mafx list                              # projects and components
 mafx run hello-world/greeter           # interactive session
 mafx run hello-world/greeter -p "What's the weather in Paris and Lisbon?"   # run once and exit

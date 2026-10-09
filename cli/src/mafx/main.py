@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import shutil
+import subprocess
 import sys
 import warnings
 from pathlib import Path
@@ -39,9 +40,13 @@ app = typer.Typer(
 new_app = typer.Typer(help="Create projects and components from templates.", no_args_is_help=True)
 tool_app = typer.Typer(help="Call and inspect tools directly (no model involved).", no_args_is_help=True)
 trace_app = typer.Typer(help="Replay and inspect recorded trajectories (.mafx/runs).", no_args_is_help=True)
+infra_app = typer.Typer(
+    help="Local supporting services (infra/<name>/compose.yaml), e.g. SearXNG.", no_args_is_help=True
+)
 app.add_typer(new_app, name="new")
 app.add_typer(tool_app, name="tool")
 app.add_typer(trace_app, name="trace")
+app.add_typer(infra_app, name="infra")
 
 out = Console()
 err = Console(stderr=True)
@@ -323,6 +328,7 @@ def doctor(
         row(False, "provider", str(e))
         raise typer.Exit(1) from None
     row(True, "provider", name)
+    _doctor_searxng(row)
     if not live or name == "mock":
         return
 
@@ -392,6 +398,21 @@ def doctor(
         asyncio.run(probe())
     except ProviderConfigError as e:
         row(False, "client", str(e))
+
+
+def _doctor_searxng(row: Any) -> None:
+    url = os.environ.get("SEARXNG_URL", "").rstrip("/")
+    if not url:
+        row(None, "web search (SEARXNG_URL)", "not set — mafx infra up searxng, then SEARXNG_URL=http://127.0.0.1:8888")
+        return
+    import httpx
+
+    try:
+        resp = httpx.get(f"{url}/search", params={"q": "test", "format": "json"}, timeout=15)
+        resp.raise_for_status()
+        row(True, "web search (SEARXNG_URL)", f"{url}: {len(resp.json().get('results', []))} results for a test query")
+    except Exception as e:  # noqa: BLE001
+        row(False, "web search (SEARXNG_URL)", f"{url}: {e}")
 
 
 @app.command()
@@ -639,6 +660,97 @@ def trace_show(
         else:
             renderer.handle(e)
     renderer.finish()
+
+
+# ---------------------------------------------------------------------------------------------- infra
+
+
+def _infra_services(ws, name: str | None) -> list[Path]:
+    root = ws.root / "infra"
+    found = sorted(p.parent for p in root.glob("*/compose.yaml"))
+    if name is None:
+        return found
+    match = [p for p in found if p.name == name]
+    if not match:
+        _fail(f"no infra service '{name}' (known: {', '.join(p.name for p in found) or 'none'})")
+    return match
+
+
+def _compose(folder: Path, *args: str) -> subprocess.CompletedProcess:
+    if shutil.which("docker") is None:
+        _fail("docker is not on PATH")
+    return subprocess.run(
+        ["docker", "compose", "-f", "compose.yaml", *args], cwd=folder, capture_output=True, text=True
+    )
+
+
+def _ensure_env(folder: Path) -> None:
+    """Create the folder's .env from .env.example once, replacing <generate> with random secrets."""
+    import secrets
+
+    env, example = folder / ".env", folder / ".env.example"
+    if env.exists() or not example.exists():
+        return
+    lines = [
+        line.replace("<generate>", secrets.token_hex(32)) if not line.startswith("#") else line
+        for line in example.read_text().splitlines()
+    ]
+    env.write_text("\n".join(lines) + "\n")
+    env.chmod(0o600)
+    out.print(Text(f"  + {env.relative_to(folder.parent.parent)} (generated secrets)", style="green"))
+
+
+@infra_app.command("up")
+def infra_up(name: str | None = typer.Argument(None, help="service (default: all)")) -> None:
+    """Start local services (generates their secrets on first run)."""
+    ws = _ws()
+    for folder in _infra_services(ws, name):
+        _ensure_env(folder)
+        result = _compose(folder, "up", "-d")
+        if result.returncode != 0:
+            _fail(f"{folder.name}: {result.stderr.strip()}", code=1)
+        out.print(Text(f"✓ {folder.name} started", style="green"))
+    infra_status(name)
+
+
+@infra_app.command("down")
+def infra_down(name: str | None = typer.Argument(None, help="service (default: all)")) -> None:
+    """Stop and remove local services (their secrets are kept)."""
+    ws = _ws()
+    for folder in _infra_services(ws, name):
+        result = _compose(folder, "down")
+        if result.returncode != 0:
+            _fail(f"{folder.name}: {result.stderr.strip()}", code=1)
+        out.print(Text(f"✓ {folder.name} stopped", style="green"))
+
+
+@infra_app.command("status")
+def infra_status(name: str | None = typer.Argument(None, help="service (default: all)")) -> None:
+    """Show local services and their containers."""
+    ws = _ws()
+    table = Table(box=None, header_style="bold")
+    for col in ("service", "container", "state", "ports"):
+        table.add_column(col)
+    for folder in _infra_services(ws, name):
+        result = _compose(folder, "ps", "--all", "--format", "json")
+        rows = (
+            [json.loads(line) for line in result.stdout.splitlines() if line.strip()] if result.returncode == 0 else []
+        )
+        if not rows:
+            table.add_row(folder.name, "-", Text("not running", style="dim"), "")
+        for row in rows:
+            state = row.get("State", "?")
+            table.add_row(
+                folder.name,
+                row.get("Name", "?"),
+                Text(state, style="green" if state == "running" else "yellow"),
+                row.get("Publishers")
+                and ", ".join(
+                    f"{p.get('URL')}:{p.get('PublishedPort')}" for p in row["Publishers"] if p.get("PublishedPort")
+                )
+                or "",
+            )
+    out.print(table)
 
 
 def cli() -> None:

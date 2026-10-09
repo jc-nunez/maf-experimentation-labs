@@ -16,6 +16,7 @@ obj/
 
 # Local config and run data
 .env
+infra/*/.env
 .mafx/
 checkpoints/
 

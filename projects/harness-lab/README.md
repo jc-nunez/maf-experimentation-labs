@@ -38,7 +38,7 @@ The harness's own tools show up in the trajectory, so you can follow its plannin
 - file memory: `file_memory_write`, `file_memory_read`, …
 
 ## Adaptations for this workspace
-- **Web search comes from SearXNG, not the provider.** The harness's built-in web search is a hosted OpenAI/Foundry tool that SGLang doesn't have, so it is disabled. The agents use the shared `web` tools instead, which work with any model. Set `SEARXNG_URL` in `.env`. `fetch_url` refuses private, loopback and tailnet addresses, checked both before connecting and on the connected socket.
+- **Web search comes from SearXNG, not the provider.** The harness's built-in web search is a hosted OpenAI/Foundry tool that SGLang doesn't have, so it is disabled. The agents use the shared `web` tools instead, which work with any model. Start it with `mafx infra up searxng` (local Docker) and set `SEARXNG_URL=http://127.0.0.1:8888` in `.env`. `fetch_url` refuses private, loopback and tailnet addresses, checked both before connecting and on the connected socket.
 - **File memory is stored under `.mafx/memory/harness-lab/<session>/`** (gitignored), not `./agent-file-memory` in the current directory.
 - **Context window:** compaction is sized for Qwen3.8-Flash-Next (262K context, 16K output).
 - **SGLang reasoning replay:** the harness persists history after every model call and tags compacted reasoning groups. The `sglang` provider strips reasoning and those tags at the request layer (`SGLangResponsesClient`); see `docs/providers.md`.

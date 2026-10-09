@@ -16,6 +16,7 @@ looking upward for `maf-labs.yaml`; set `MAFX_HOME` to use it from anywhere.
 | `mafx doctor` | Check the toolchain, `.env`, `GET /models`, a Responses call and a tool call |
 | `mafx models` | Models served by the endpoint |
 | `mafx trace list` / `mafx trace show [run\|last]` | Recorded trajectories; replay one |
+| `mafx infra up\|down\|status [name]` | Local supporting services from `infra/<name>/compose.yaml` (e.g. SearXNG); secrets generated on first run |
 
 `run` options:
 - `--provider`, `--model`: override the provider or model for this run.

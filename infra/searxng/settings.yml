@@ -1,0 +1,12 @@
+# SearXNG settings for local agent web search. Secret-free: server.secret_key comes from SEARXNG_SECRET.
+use_default_settings: true
+
+server:
+  # Only this machine can reach the instance (127.0.0.1); the bot limiter would block agents.
+  limiter: false
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json

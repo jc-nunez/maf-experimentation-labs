@@ -41,7 +41,10 @@ mafx run harness-lab/analyst --allow-tool file_access_write -p "Write hello to h
 mafx run harness-lab/analyst-dotnet -y -p "Write hello to hello.md"                         # .NET, approve all
 ls .mafx/work/harness-lab/analyst/
 
-# Web search (needs SEARXNG_URL)
+# Web search: local SearXNG (Docker), then SEARXNG_URL=http://127.0.0.1:8888 in .env
+mafx infra up searxng
+mafx infra status
+mafx doctor                                         # includes a web search check
 mafx tool inspect harness-lab/web
 mafx tool run harness-lab/web -a '{"_function":"web_search","query":"SGLang responses API","max_results":3}'
 mafx tool run harness-lab/web -a '{"_function":"fetch_url","url":"https://docs.searxng.org/dev/search_api.html"}'
