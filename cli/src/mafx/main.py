@@ -753,12 +753,25 @@ def infra_status(name: str | None = typer.Argument(None, help="service (default:
     out.print(table)
 
 
+def _installed_workspace() -> Path | None:
+    """The workspace containing this mafx's own source (editable installs), if any."""
+    here = Path(__file__).resolve()
+    for directory in here.parents:
+        if (directory / "maf-labs.yaml").is_file():
+            return directory
+    return None
+
+
 def _use_workspace_environment() -> None:
     """Re-run under the workspace's .venv when this mafx was installed elsewhere (e.g. `uv tool install`).
 
     Projects and shared tools are loaded from source, but their dependencies (trafilatura, ddgs, ...) live in the
     workspace environment that `uv sync --all-packages` maintains. A globally installed mafx therefore hands off
     to ``<workspace>/.venv/bin/mafx``. Set MAFX_NO_REEXEC=1 to disable.
+
+    Only trusted workspaces get the hand-off: the one this mafx was installed from (an editable install of its
+    ``cli/``), or one named explicitly with MAFX_HOME. Otherwise running mafx inside an untrusted folder that
+    contains maf-labs.yaml and .venv/bin/mafx would execute that folder's binary.
     """
     if os.environ.get("MAFX_NO_REEXEC"):
         return
@@ -766,10 +779,15 @@ def _use_workspace_environment() -> None:
         ws = targets.workspace()
     except WorkspaceNotFound:
         return
-    venv = ws.root / ".venv"
+    root = ws.root.resolve()
+    if not os.environ.get("MAFX_HOME") and root != _installed_workspace():
+        return
+    venv = root / ".venv"
     workspace_mafx = venv / ("Scripts/mafx.exe" if os.name == "nt" else "bin/mafx")
     if Path(sys.prefix).resolve() == venv.resolve():
         return
+    if workspace_mafx.exists() and not workspace_mafx.resolve().is_relative_to(venv.resolve()):
+        return  # a link pointing outside the workspace environment: do not follow it
     if not workspace_mafx.exists():
         err.print(
             Text(
