@@ -216,7 +216,8 @@ def print_info(console: Console, info: dict[str, Any]) -> None:
         Text("╭─ ", style="dim")
         + Text(info.get("target", "?"), style="bold")
         + Text(
-            f"  ·  {info.get('runtime')}  ·  {info.get('provider')} ({info.get('api')})  ·  {info.get('model')}",
+            f"  ·  {info.get('runtime')}  ·  {info.get('provider')} ({info.get('api')})  ·  {info.get('model')}"
+            f"  ·  effort {info.get('effort', 'default')}",
             style="dim",
         )
     )

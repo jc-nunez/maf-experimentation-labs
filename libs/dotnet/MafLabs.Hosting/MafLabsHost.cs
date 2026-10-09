@@ -63,10 +63,12 @@ public sealed class MafLabsHost
             }
             if (_agents.Count == 0) throw new InvalidOperationException("no agents registered (call host.AddAgent before RunAsync)");
 
-            var (client, info) = Providers.Create(Options.Provider, Options.Model);
+            if (Options.Effort is { } requested) Providers.ParseEffort(requested); // fail fast on a bad value
+            var effort = new EffortSetting(Options.Effort);
+            var (client, info) = Providers.Create(Options.Provider, Options.Model, () => effort.Value);
             var name = ResolveTarget();
             var registration = _agents[name];
-            var runner = new AgentRunner(registration.Factory(client), name, info, registration.Tools);
+            var runner = new AgentRunner(registration.Factory(client), name, info, registration.Tools, effort);
             await runner.ResetAsync();
 
             if (Options.Stdio) return await ServeStdioAsync(runner);
@@ -152,6 +154,19 @@ public sealed class MafLabsHost
                     await runner.ResetAsync();
                     Send(Events.Create("reset_done"));
                     break;
+                case "set_effort":
+                    var requested = msg["effort"]?.GetValue<string>();
+                    try
+                    {
+                        if (requested is not null) Providers.ParseEffort(requested);
+                        runner.Effort.Value = requested;
+                        Send(Events.Create("effort_set", ("effort", requested ?? "default")));
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        Send(Events.Create("error", ("message", ex.Message)));
+                    }
+                    break;
                 case "user":
                     await foreach (var e in runner.TurnAsync(msg["text"]?.GetValue<string>() ?? "")) Send(e);
                     break;
@@ -179,8 +194,16 @@ public sealed class MafLabsHost
     }
 }
 
-internal sealed class AgentRunner(AIAgent agent, string name, ProviderInfo provider, string[] toolNames)
+/// <summary>The reasoning effort for the following model calls; null means the server default.</summary>
+internal sealed class EffortSetting(string? value)
 {
+    public string? Value { get; set; } = value;
+}
+
+internal sealed class AgentRunner(AIAgent agent, string name, ProviderInfo provider, string[] toolNames, EffortSetting effort)
+{
+    public EffortSetting Effort => effort;
+
     private AgentSession? _session;
 
     public string Name => name;
@@ -194,6 +217,7 @@ internal sealed class AgentRunner(AIAgent agent, string name, ProviderInfo provi
         ["provider"] = provider.Provider,
         ["model"] = provider.Model,
         ["api"] = provider.Api,
+        ["effort"] = effort.Value ?? "default",
         ["agent_name"] = agent.Name,
         ["tools"] = new JsonArray(toolNames.Select(t => (JsonNode)JsonValue.Create(t)!).ToArray()),
         ["instructions"] = agent.GetService<ChatClientAgent>()?.Instructions,

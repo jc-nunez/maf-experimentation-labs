@@ -29,6 +29,8 @@ class HostContext:
     provider: ProviderInfo
     workspace_root: Path | None = None
     settings: dict[str, Any] = field(default_factory=dict)
+    reasoning_effort: str | None = None
+    """Effort requested for this run (--effort), for factories that build several agents (e.g. workflows)."""
 
     def tools(self, *names: str) -> list[Any]:
         """Build tools declared in the manifest by name (for use inside python factories)."""
@@ -148,7 +150,17 @@ def build_agent(spec: AgentSpec, ctx: HostContext) -> Any:
     if isinstance(options, dict):
         for key, value in ctx.provider.default_options.items():
             options.setdefault(key, value)
+        # The manifest's reasoning_effort overrides what the factory set; --effort overrides both per run.
+        if spec.reasoning_effort:
+            options["reasoning"] = {**(options.get("reasoning") or {}), "effort": spec.reasoning_effort}
     return agent
+
+
+def effective_effort(agent: Any) -> str | None:
+    """The reasoning effort an agent is configured with, or None for the server default."""
+    options = getattr(agent, "default_options", None) or {}
+    reasoning = options.get("reasoning") if isinstance(options, dict) else None
+    return reasoning.get("effort") if isinstance(reasoning, dict) else None
 
 
 def agent_tools(spec: AgentSpec, ctx: HostContext) -> list[Any]:

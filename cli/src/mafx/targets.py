@@ -92,14 +92,29 @@ def resolve(ws: Workspace, ref: str | None, kinds: tuple[str, ...] = ("agents", 
 
 
 def make_runner(
-    target: Target, *, provider: str | None, model: str | None, record: bool, mode: str, build: bool = True
+    target: Target,
+    *,
+    provider: str | None,
+    model: str | None,
+    record: bool,
+    mode: str,
+    build: bool = True,
+    effort: str | None = None,
 ) -> Runner:
     load_env(target.workspace, target.project.root)
     if target.runtime == "dotnet":
         from .dotnet import DotnetRunner
 
         _, spec = target.project.find(target.name)
-        runner: Runner = DotnetRunner(target, spec, provider=provider, model=model, build=build)
+        # .NET hosts get the manifest's reasoning_effort as a flag unless --effort overrides it.
+        runner: Runner = DotnetRunner(
+            target,
+            spec,
+            provider=provider,
+            model=model,
+            build=build,
+            effort=effort or getattr(spec, "reasoning_effort", None),
+        )
     else:
         runner = create_runner(
             target.project,
@@ -108,6 +123,7 @@ def make_runner(
             model=model,
             workspace_root=target.workspace.root,
             default_provider=target.workspace.default("provider"),
+            reasoning_effort=effort,
         )
     if record:
         runner = RecordingRunner(runner, target.workspace.runs_dir, mode)

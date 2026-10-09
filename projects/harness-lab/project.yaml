@@ -12,17 +12,20 @@ components:
       runtime: python
       entry: harness_lab.agents.claw:create_agent
       tools: [get-stock-price, web]
+      reasoning_effort: medium    # planning + tool use; xhigh is rarely needed here
 
     - name: researcher
       description: Research assistant on create_harness_agent with web search via SearXNG (port of harness_research.py)
       runtime: python
       entry: harness_lab.agents.researcher:create_agent
       tools: [web]
+      # no reasoning_effort: research uses the server default (xhigh)
 
     - name: claw-dotnet
       description: Same assistant on the .NET HarnessAgent (AsHarnessAgent)
       runtime: dotnet
       project: dotnet/HarnessLab/HarnessLab.csproj
+      reasoning_effort: medium
 
   tools:
     - name: get-stock-price

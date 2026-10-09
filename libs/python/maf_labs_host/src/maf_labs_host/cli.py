@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from . import events as ev
-from .manifest import Project, find_project_dir, load_project
+from .manifest import REASONING_EFFORTS, Project, find_project_dir, load_project
 from .runner import RecordingRunner, Runner, create_runner
 from .workspace import WorkspaceNotFound, find_workspace, load_env
 
@@ -30,6 +30,9 @@ def build_parser(prog: str | None = None) -> argparse.ArgumentParser:
     p.add_argument("--output", choices=["text", "json", "jsonl"], default="text")
     p.add_argument("--provider", help="sglang | openai | azure-openai | foundry | mock")
     p.add_argument("--model", help="override the provider's model")
+    p.add_argument(
+        "--effort", choices=REASONING_EFFORTS, help="reasoning effort for this run (sglang: none|low|medium|xhigh)"
+    )
     p.add_argument("--stdio", action="store_true", help="speak the JSONL host protocol on stdin/stdout")
     p.add_argument("--list", action="store_true", help="list components and exit")
     p.add_argument("--quiet", action="store_true", help="text mode: do not print the trajectory to stderr")
@@ -130,6 +133,12 @@ async def serve_stdio(runner: Runner) -> int:
         elif mtype == "user":
             async for e in runner.turn(msg.get("text", "")):
                 send(e)
+        elif mtype == "set_effort":
+            try:
+                await runner.set_effort(msg.get("effort"))
+                send(ev.event("effort_set", effort=runner.info.get("effort")))
+            except NotImplementedError as exc:
+                send(ev.event(ev.ERROR, message=str(exc)))
         else:
             send(ev.event(ev.ERROR, message=f"unknown message type: {mtype}"))
 
@@ -156,6 +165,7 @@ async def _amain(project: Project, args: argparse.Namespace) -> int:
         model=args.model,
         workspace_root=workspace.root if workspace else None,
         default_provider=default_provider,
+        reasoning_effort=args.effort,
     )
     if workspace and not args.no_trace:
         mode = "stdio" if args.stdio else ("once" if args.prompt is not None else "interactive")

@@ -3,16 +3,23 @@
 from agent_framework import Agent, WorkflowBuilder
 
 
-def create_workflow(client):
+def create_workflow(client, context):
+    # Per-agent reasoning effort: drafting is quick, reviewing deserves more thought.
+    # --effort on the command line (context.reasoning_effort) overrides both.
+    def effort(default: str) -> dict:
+        return {"reasoning": {"effort": context.reasoning_effort or default}}
+
     writer = Agent(
         client,
         "You write a short, clear first draft for the user's request. Output only the draft.",
         name="writer",
+        default_options=effort("low"),
     )
     reviewer = Agent(
         client,
         "You review the draft you receive. List up to three concrete improvements, then give the revised text.",
         name="reviewer",
+        default_options=effort("medium"),
     )
     return (
         # output_from: whose responses are the workflow result.

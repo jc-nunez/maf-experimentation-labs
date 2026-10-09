@@ -12,17 +12,20 @@ components:
       runtime: python
       entry: hello_world.agents.greeter:create_agent
       tools: [get_weather]
+      reasoning_effort: low       # simple lookups: little thinking needed (override per run with --effort)
 
     - name: greeter-yaml
       description: Same assistant, defined declaratively
       runtime: declarative
       file: declarative/agents/greeter.yaml
       tools: [get_weather]
+      reasoning_effort: low
 
     - name: greeter-dotnet
       description: Same assistant on .NET (project-based)
       runtime: dotnet
       project: dotnet/HelloWorld/HelloWorld.csproj
+      reasoning_effort: low       # passed to the .NET host as --effort
 
     - name: greeter-dotnet-file
       description: Same assistant on .NET (single-file app, dotnet run apps/greeter.cs)

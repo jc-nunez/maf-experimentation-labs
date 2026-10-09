@@ -8,6 +8,7 @@ public sealed record HostOptions
     public string Output { get; init; } = "text";
     public string? Provider { get; init; }
     public string? Model { get; init; }
+    public string? Effort { get; init; }
     public bool Stdio { get; init; }
     public bool List { get; init; }
     public bool Quiet { get; init; }
@@ -25,6 +26,7 @@ public sealed record HostOptions
                 "--output" or "-o" => o with { Output = Next() },
                 "--provider" => o with { Provider = Next() },
                 "--model" => o with { Model = Next() },
+                "--effort" => o with { Effort = Next() },
                 "--stdio" => o with { Stdio = true },
                 "--list" => o with { List = true },
                 "--quiet" => o with { Quiet = true },

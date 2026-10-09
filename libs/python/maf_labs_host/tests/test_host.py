@@ -104,3 +104,27 @@ async def test_sglang_client_never_replays_reasoning(monkeypatch):
     assert [c.type for c in sent["messages"][1].contents] == ["function_call"]
     assert sent["messages"][0] is history[0] and sent["messages"][2] is history[2]
     assert any(c.type == "text_reasoning" for c in history[1].contents)  # session history untouched
+
+
+async def test_reasoning_effort_manifest_default_and_run_override():
+    from maf_labs_host import create_runner, load_project
+
+    project = load_project(ROOT / "projects/hello-world")
+    runner = create_runner(project, "greeter", provider="mock")
+    await runner.start()
+    assert runner.agent.default_options["reasoning"] == {"effort": "low"}  # from project.yaml
+    assert runner.info["effort"] == "low"
+    await runner.set_effort("none")
+    assert runner.info["effort"] == "none"
+    await runner.set_effort(None)
+    assert runner.info["effort"] == "low"
+    overridden = create_runner(project, "greeter", provider="mock", reasoning_effort="xhigh")
+    await overridden.start()
+    assert overridden.info["effort"] == "xhigh"
+
+
+def test_unknown_reasoning_effort_is_rejected():
+    with pytest.raises(ValidationError):
+        Project.model_validate(
+            {"name": "x", "components": {"agents": [{"name": "a", "entry": "m:f", "reasoning_effort": "max"}]}}
+        )

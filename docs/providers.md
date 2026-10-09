@@ -16,6 +16,7 @@ Choose one with `--provider` or `MAF_PROVIDER`. The default comes from `defaults
 - **.NET compatibility fixes** (applied automatically by the `sglang` provider in `MafLabs.Hosting`):
   - SGLang sends `created_at` as a float. The OpenAI .NET SDK expects an integer and throws `FormatException`, so `SglangCompatPolicy` rewrites these timestamps while the response streams.
   - The .NET SDK sends `"strict": null` on tool definitions, which SGLang rejects, so the provider sets `strict: false` explicitly.
+- **Reasoning effort:** the server accepts `none`, `low`, `medium` and `xhigh` (default) and rejects `high`. With `none`, the model skips thinking entirely but still calls tools; that's the fastest option for simple lookups. See "Reasoning effort" in `docs/manifest.md` for how to set it per agent and per run.
 - **Debugging:** `MAFX_DEBUG=1` prints full Python tracebacks and .NET stack traces in error events.
 - **Tool calling needs a parser.** SGLang must be started with a tool-call parser that matches the model (`--tool-call-parser …`), and with a reasoning parser if you want reasoning streamed separately. `mafx doctor` warns when the model answers without calling the test tool.
 - **Chat Completions fallback.** If a Responses feature misbehaves, set `SGLANG_API=chat` to tell whether the problem is the model or the API layer.

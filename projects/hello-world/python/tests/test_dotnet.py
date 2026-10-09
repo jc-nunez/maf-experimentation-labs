@@ -29,3 +29,19 @@ async def test_dotnet_agent_calls_tool(target):
     assert calls and calls[0]["name"] == "get_weather" and calls[0]["arguments"] == {"city": "Paris"}
     assert results and results[0]["result"]["city"] == "Paris"
     assert events[-1]["ok"] and second[-1]["text"] == "[mock] again"
+
+
+async def test_dotnet_effort_can_change_mid_session():
+    from mafx import targets
+
+    tgt = targets.resolve(find_workspace(ROOT), "hello-world/greeter-dotnet")
+    runner = targets.make_runner(tgt, provider="mock", model=None, record=False, mode="once")
+    await runner.start()
+    try:
+        assert runner.info["effort"] == "low"  # manifest reasoning_effort, passed as --effort
+        await runner.set_effort("none")
+        assert runner.info["effort"] == "none"
+        with pytest.raises(RuntimeError, match="unknown reasoning effort"):
+            await runner.set_effort("max")
+    finally:
+        await runner.close()

@@ -19,6 +19,7 @@ looking upward for `maf-labs.yaml`; set `MAFX_HOME` to use it from anywhere.
 
 `run` options:
 - `--provider`, `--model`: override the provider or model for this run.
+- `--effort none|low|medium|xhigh` (`-e`): reasoning effort for this run. It overrides the agent's `reasoning_effort`.
 - `--view full|normal|quiet`: how much of the trajectory to show.
 - `--output text|json|jsonl`: output format in `-p` mode.
 - `--plain`: no live markdown rendering.
@@ -37,6 +38,7 @@ folder, or when the name is unique across the workspace).
   - `/reset`: start a new session
   - `/info`: what is running
   - `/system`: show the instructions
+  - `/effort none|low|medium|xhigh|default`: change the reasoning effort for the following turns
   - `/trace`: show the trace file path
   - `/clear`, `/exit`
 - **History** is saved per target in `.mafx/history/`.

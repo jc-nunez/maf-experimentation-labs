@@ -35,7 +35,9 @@ class DotnetRunner(Runner):
 
     kind = "agent"
 
-    def __init__(self, target, spec, *, provider: str | None, model: str | None, build: bool = True) -> None:
+    def __init__(
+        self, target, spec, *, provider: str | None, model: str | None, build: bool = True, effort: str | None = None
+    ) -> None:
         self.target = target.label
         self.kind = "workflow" if target.kind == "workflows" else "agent"
         args = ["--stdio", target.name]
@@ -45,6 +47,8 @@ class DotnetRunner(Runner):
             args += ["--provider", os.environ.get("MAF_PROVIDER", default)]
         if model:
             args += ["--model", model]
+        if effort:
+            args += ["--effort", effort]
         self.cmd = dotnet_command(target.project.root, spec, args, build=build)
         self.cwd = target.project.root
         self.proc: asyncio.subprocess.Process | None = None
@@ -99,6 +103,15 @@ class DotnetRunner(Runner):
         await self._send({"type": "reset"})
         while (msg := await self._read()) is not None and msg.get("type") != "reset_done":
             pass
+
+    async def set_effort(self, effort: str | None) -> None:
+        await self._send({"type": "set_effort", "effort": effort})
+        while (msg := await self._read()) is not None:
+            if msg.get("type") == "effort_set":
+                self.info["effort"] = msg.get("effort")
+                return
+            if msg.get("type") == "error":
+                raise RuntimeError(msg.get("message"))
 
     async def close(self) -> None:
         if self.proc and self.proc.returncode is None:

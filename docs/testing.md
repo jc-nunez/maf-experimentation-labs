@@ -84,6 +84,16 @@ mafx trace show last                  # replay the latest run with the same rend
 mafx trace show <run-id> --view quiet
 ```
 
+## Reasoning effort
+```bash
+mafx run hello-world/greeter -p "Weather in Paris?"                  # manifest default (low)
+mafx run hello-world/greeter -p "Weather in Paris?" --effort none    # no thinking: fastest
+mafx run hello-world/greeter -p "Weather in Paris?" -e xhigh         # maximum thinking
+mafx run harness-lab/claw-dotnet -p "Price of NVDA?" --effort none    # .NET, harness included
+mafx run hello-world/draft-review -p "A haiku about effort"            # per-agent: writer low, reviewer medium
+mafx run hello-world/greeter                                           # interactive: /effort none … /effort default
+```
+
 ## Provider and model variants
 ```bash
 mafx run hello-world/greeter -p "hi" --provider mock                         # offline

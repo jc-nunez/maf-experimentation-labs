@@ -13,7 +13,39 @@ public static class Providers
 {
     public static readonly string[] Names = ["sglang", "openai", "azure-openai", "foundry", "mock"];
 
-    public static (IChatClient Client, ProviderInfo Info) Create(string? provider, string? model)
+    /// <summary>
+    /// Creates the provider's chat client. <paramref name="effort"/> is read on every call, so the reasoning
+    /// effort can change during a session (it applies to every agent built on the client, harness included).
+    /// </summary>
+    public static (IChatClient Client, ProviderInfo Info) Create(string? provider, string? model, Func<string?>? effort = null)
+    {
+        var (client, info) = CreateCore(provider, model);
+        if (effort is null) return (client, info);
+        var withEffort = client.AsBuilder()
+            .ConfigureOptions(o =>
+            {
+                if (effort() is { } value)
+                {
+                    o.Reasoning ??= new ReasoningOptions();
+                    o.Reasoning.Effort = ParseEffort(value);
+                }
+            })
+            .Build();
+        return (withEffort, info);
+    }
+
+    /// <summary>Maps the shared effort names (none, minimal, low, medium, high, xhigh) to <see cref="ReasoningEffort"/>.</summary>
+    public static ReasoningEffort ParseEffort(string value) => value.ToLowerInvariant() switch
+    {
+        "none" => ReasoningEffort.None,
+        "minimal" or "low" => ReasoningEffort.Low,
+        "medium" => ReasoningEffort.Medium,
+        "high" => ReasoningEffort.High,
+        "xhigh" => ReasoningEffort.ExtraHigh,
+        _ => throw new ArgumentException($"unknown reasoning effort '{value}' (none, low, medium, high, xhigh)"),
+    };
+
+    private static (IChatClient Client, ProviderInfo Info) CreateCore(string? provider, string? model)
     {
         var name = Resolve(provider);
         switch (name)

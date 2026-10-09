@@ -12,7 +12,7 @@ from typing import Any
 from . import events as ev
 from .manifest import AgentSpec, Project, WorkflowSpec
 from .providers import ProviderInfo, create_chat_client
-from .runtime import HostContext, agent_tools, build_agent, build_workflow
+from .runtime import HostContext, agent_tools, build_agent, build_workflow, effective_effort
 from .trace import TraceWriter
 
 
@@ -32,6 +32,10 @@ class Runner:
 
     async def reset(self) -> None: ...
 
+    async def set_effort(self, effort: str | None) -> None:
+        """Override the reasoning effort for the following turns (None restores the configured default)."""
+        raise NotImplementedError(f"{type(self).__name__} does not support changing the reasoning effort")
+
     def describe(self) -> dict[str, Any]:
         return self.info
 
@@ -46,6 +50,7 @@ class AgentRunner(Runner):
         self.agent: Any = None
         self.session: Any = None
         self.tools: list[Any] = []
+        self.effort_override: str | None = ctx.reasoning_effort
         self._stack = contextlib.AsyncExitStack()
         self.info = {
             "target": self.target,
@@ -68,6 +73,14 @@ class AgentRunner(Runner):
         self.info.update(
             agent_name=getattr(self.agent, "name", None), tools=tool_names, instructions=options.get("instructions")
         )
+        self._update_effort_info()
+
+    def _update_effort_info(self) -> None:
+        self.info["effort"] = self.effort_override or effective_effort(self.agent) or "default"
+
+    async def set_effort(self, effort: str | None) -> None:
+        self.effort_override = effort
+        self._update_effort_info()
 
     async def reset(self) -> None:
         self.session = self.agent.create_session()
@@ -79,7 +92,8 @@ class AgentRunner(Runner):
         started = time.perf_counter()
         tr = ev.UpdateTranslator()
         try:
-            stream = self.agent.run(text, stream=True, session=self.session, tools=self.tools or None)
+            options = {"reasoning": {"effort": self.effort_override}} if self.effort_override else None
+            stream = self.agent.run(text, stream=True, session=self.session, tools=self.tools or None, options=options)
             async for update in stream:
                 for e in tr.translate(update):
                     yield e
@@ -112,6 +126,8 @@ class WorkflowRunner(Runner):
             "provider": ctx.provider.provider,
             "model": ctx.provider.model,
             "api": ctx.provider.api,
+            # Workflows set effort per agent in their factory; --effort reaches them via context.reasoning_effort.
+            "effort": ctx.reasoning_effort or "per-agent",
         }
 
     async def start(self) -> None:
@@ -251,6 +267,7 @@ def create_runner(
     model: str | None = None,
     workspace_root: Path | None = None,
     default_provider: str | None = None,
+    reasoning_effort: str | None = None,
 ) -> Runner:
     """Create an in-process runner (python / declarative runtimes)."""
     name = name or project.default_target()
@@ -260,7 +277,9 @@ def create_runner(
     from .providers import resolve_provider
 
     client, info = create_chat_client(resolve_provider(provider, default_provider), model)
-    ctx = HostContext(project=project, client=client, provider=info, workspace_root=workspace_root)
+    ctx = HostContext(
+        project=project, client=client, provider=info, workspace_root=workspace_root, reasoning_effort=reasoning_effort
+    )
     if kind == "agents":
         return AgentRunner(ctx, spec)  # type: ignore[arg-type]
     return WorkflowRunner(ctx, spec)  # type: ignore[arg-type]
@@ -292,6 +311,10 @@ class RecordingRunner(Runner):
     async def close(self) -> None:
         await self.inner.close()
         self.trace.close()
+
+    async def set_effort(self, effort: str | None) -> None:
+        await self.inner.set_effort(effort)
+        self.trace.write(ev.event("effort_changed", effort=effort or "default"))
 
     async def turn(self, text: str) -> AsyncIterator[dict[str, Any]]:
         self.trace.write(ev.event("user_message", text=text))

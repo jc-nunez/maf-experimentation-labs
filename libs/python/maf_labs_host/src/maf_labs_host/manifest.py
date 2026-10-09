@@ -10,6 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Runtime = Literal["python", "declarative", "dotnet"]
 Kind = Literal["agents", "tools", "workflows"]
+# Reasoning effort values across providers. SGLang (Qwen3.8) accepts none, low, medium and xhigh (default).
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
+REASONING_EFFORTS: tuple[str, ...] = ("none", "minimal", "low", "medium", "high", "xhigh")
 MANIFEST = "project.yaml"
 
 
@@ -36,6 +39,9 @@ class _Component(BaseModel):
 
 class AgentSpec(_Component):
     tools: list[str] = Field(default_factory=list, description="tool names from this manifest to attach")
+    reasoning_effort: ReasoningEffort | None = Field(
+        None, description="default reasoning effort for this agent (overridden by --effort)"
+    )
 
 
 class WorkflowSpec(_Component):

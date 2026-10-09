@@ -13,7 +13,7 @@ from typing import Any
 
 import typer
 from maf_labs_host import events as ev
-from maf_labs_host.manifest import MANIFEST, load_project
+from maf_labs_host.manifest import MANIFEST, REASONING_EFFORTS, load_project
 from maf_labs_host.providers import (
     PROVIDERS,
     ProviderConfigError,
@@ -77,6 +77,9 @@ def run(
     output: str = typer.Option("text", "--output", "-o", help="-p mode: text | json | jsonl"),
     provider: str | None = ProviderOpt,
     model: str | None = ModelOpt,
+    effort: str | None = typer.Option(
+        None, "--effort", "-e", help="reasoning effort for this run: none|low|medium|xhigh (sglang) or high"
+    ),
     view: str | None = typer.Option(None, "--view", help="full | normal | quiet (default: maf-labs.yaml)"),
     plain: bool = typer.Option(False, "--plain", help="no live markdown rendering"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="-p text mode: only print the answer"),
@@ -95,13 +98,15 @@ def run(
         _fail(f"--view must be one of {', '.join(VIEWS)}")
     if output not in ("text", "json", "jsonl"):
         _fail("--output must be text, json or jsonl")
+    if effort is not None and effort not in REASONING_EFFORTS:
+        _fail(f"--effort must be one of {', '.join(REASONING_EFFORTS)}")
     mode = "once" if prompt is not None else "interactive"
     if prompt == "-":
         prompt = sys.stdin.read()
 
     async def main() -> int:
         runner = targets.make_runner(
-            tgt, provider=provider, model=model, record=not no_trace, mode=mode, build=not no_build
+            tgt, provider=provider, model=model, record=not no_trace, mode=mode, build=not no_build, effort=effort
         )
         await runner.start()
         try:

@@ -26,6 +26,7 @@ COMMANDS = {
     "/reset": "start a new session (clears history)",
     "/retry": "re-run the last prompt",
     "/view": "full | normal | quiet — how much of the trajectory to show",
+    "/effort": "none | low | medium | xhigh | default — reasoning effort for the next turns",
     "/info": "target, provider, model, tools, trace file",
     "/system": "show the agent's instructions",
     "/trace": "print the path of this run's trace.jsonl",
@@ -87,6 +88,7 @@ class Session:
         info = self.runner.info
         return HTML(
             f" <b>{info.get('target')}</b> · {info.get('provider', '?')} · {info.get('model', '?')}"
+            f" · effort {info.get('effort', 'default')}"
             f" · turns {self.turns} · in {self.tokens_in:,} / out {self.tokens_out:,} tok · view {self.view}"
             "    <i>⏎ send · Alt+⏎/Ctrl+J newline · / commands · Ctrl+C interrupt · Ctrl+D exit</i>"
         )
@@ -155,6 +157,20 @@ class Session:
                 self.view = arg
             else:
                 self.console.print(f"  view is '{self.view}'; choose one of: {', '.join(VIEWS)}")
+        elif cmd == "/effort":
+            from maf_labs_host.manifest import REASONING_EFFORTS
+
+            if arg in (*REASONING_EFFORTS, "default"):
+                try:
+                    await self.runner.set_effort(None if arg == "default" else arg)
+                    self.console.print(Text(f"  effort: {self.runner.info.get('effort')}", style="green"))
+                except (NotImplementedError, RuntimeError) as e:
+                    self.console.print(Text(f"  {e}", style="yellow"))
+            else:
+                self.console.print(
+                    f"  effort is '{self.runner.info.get('effort', 'default')}'; "
+                    f"choose one of: {', '.join(REASONING_EFFORTS)}, default"
+                )
         elif cmd == "/info":
             print_info(self.console, self.runner.info)
         elif cmd == "/system":
