@@ -44,10 +44,45 @@ async def test_search_returns_requested_number_of_results(transport, monkeypatch
     assert transport[0].url.params["format"] == "json"
 
 
-async def test_search_requires_configuration(monkeypatch):
+async def test_searxng_backend_requires_url(monkeypatch):
     monkeypatch.delenv("SEARXNG_URL", raising=False)
+    monkeypatch.setenv("WEB_SEARCH_BACKEND", "searxng")
     with pytest.raises(Exception, match="SEARXNG_URL"):
         await tools.web_search.invoke(arguments={"query": "x"}, skip_parsing=True)
+
+
+class _FakeDDGS:
+    calls: list = []
+
+    def __init__(self, **kwargs):
+        pass
+
+    def text(self, query, **kwargs):
+        _FakeDDGS.calls.append((query, kwargs))
+        return [{"title": f"t{i}", "href": f"https://d.com/{i}", "body": "b"} for i in range(kwargs["max_results"])]
+
+
+async def test_falls_back_to_duckduckgo_without_searxng(monkeypatch):
+    import ddgs
+
+    monkeypatch.delenv("SEARXNG_URL", raising=False)
+    monkeypatch.delenv("WEB_SEARCH_BACKEND", raising=False)
+    monkeypatch.setattr(ddgs, "DDGS", _FakeDDGS)
+    results = await tools.web_search.invoke(
+        arguments={"query": "agents", "max_results": 2, "time_range": "week"}, skip_parsing=True
+    )
+    assert [r["url"] for r in results] == ["https://d.com/0", "https://d.com/1"]
+    assert results[0]["engines"] == ["duckduckgo"] and _FakeDDGS.calls[-1][1]["timelimit"] == "w"
+
+
+async def test_searxng_is_preferred_when_configured(transport, monkeypatch):
+    import ddgs
+
+    monkeypatch.setenv("SEARXNG_URL", "http://searx.test")
+    monkeypatch.delenv("WEB_SEARCH_BACKEND", raising=False)
+    monkeypatch.setattr(ddgs, "DDGS", _FakeDDGS)
+    results = await tools.web_search.invoke(arguments={"query": "agents", "max_results": 1}, skip_parsing=True)
+    assert results[0]["url"] == "https://e.com/0"
 
 
 async def test_fetch_extracts_main_content_as_markdown(transport, monkeypatch):
@@ -75,6 +110,13 @@ async def test_fetch_rechecks_redirect_targets(transport, monkeypatch):
     monkeypatch.setattr(tools, "_check_public", check)
     with pytest.raises(Exception, match="not allowed"):
         await tools.fetch_url.invoke(arguments={"url": "https://e.com/moved"}, skip_parsing=True)
+
+
+@pytest.mark.live
+async def test_live_duckduckgo(monkeypatch):
+    monkeypatch.setenv("WEB_SEARCH_BACKEND", "ddgs")
+    results = await tools.web_search.invoke(arguments={"query": "Microsoft Agent Framework"}, skip_parsing=True)
+    assert results and all(r["url"].startswith("http") for r in results)
 
 
 @pytest.mark.live

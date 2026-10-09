@@ -17,6 +17,6 @@ all of them.
 
 | Package | Tools | Config |
 |---|---|---|
-| `python/web-search` | `web_search` (SearXNG JSON API), `fetch_url` (page → markdown via trafilatura; blocks non-public addresses) | `SEARXNG_URL`, `WEB_FETCH_ALLOW_PRIVATE` |
+| `python/web-search` | `web_search` (SearXNG JSON API, falling back to DuckDuckGo via `ddgs` when `SEARXNG_URL` is unset), `fetch_url` (page → markdown via trafilatura; blocks non-public addresses) | `SEARXNG_URL`, `WEB_SEARCH_BACKEND`, `WEB_FETCH_ALLOW_PRIVATE` |
 
 Create one with `mafx new tool <project> <name> --shared`.

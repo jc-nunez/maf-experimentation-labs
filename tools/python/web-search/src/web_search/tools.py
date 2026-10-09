@@ -1,7 +1,8 @@
 """Web tools for agents running on self-hosted models: search through SearXNG and read pages as markdown.
 
 Configuration (environment / .env):
-    SEARXNG_URL           Base URL of a SearXNG instance with the JSON format enabled (required for web_search).
+    SEARXNG_URL           Base URL of a SearXNG instance with the JSON format enabled (preferred backend).
+    WEB_SEARCH_BACKEND    auto (default: SearXNG when SEARXNG_URL is set, otherwise DuckDuckGo) | searxng | ddgs.
     WEB_FETCH_ALLOW_PRIVATE  Set to "true" to let fetch_url reach private, loopback or tailnet addresses (default off).
 """
 
@@ -50,9 +51,14 @@ async def web_search(
         Field(description="Only results from this recent period"),
     ] = None,
 ) -> list[dict[str, Any]]:
+    backend = os.environ.get("WEB_SEARCH_BACKEND", "auto").strip().lower() or "auto"
     base_url = os.environ.get("SEARXNG_URL", "").rstrip("/")
+    if backend not in ("auto", "searxng", "ddgs"):
+        raise WebToolError(f"unknown WEB_SEARCH_BACKEND '{backend}' (auto, searxng or ddgs)")
+    if backend == "ddgs" or (backend == "auto" and not base_url):
+        return await _deadline(_search_ddgs(query, max_results, time_range))
     if not base_url:
-        raise WebToolError("web search is not configured (SEARXNG_URL is not set)")
+        raise WebToolError("WEB_SEARCH_BACKEND=searxng but SEARXNG_URL is not set")
     params: dict[str, Any] = {"q": query, "format": "json"}
     if time_range:
         params["time_range"] = time_range
@@ -69,6 +75,39 @@ async def web_search(
             "snippet": (r.get("content") or "")[:500],
             "published": r.get("publishedDate"),
             "engines": r.get("engines") or [r.get("engine")],
+        }
+        for r in results[:max_results]
+    ]
+
+
+async def _search_ddgs(query: str, max_results: int, time_range: str | None) -> list[dict[str, Any]]:
+    """DuckDuckGo via the ddgs library: no service needed, but unofficial and rate-limited at times."""
+    from ddgs import DDGS
+    from ddgs.exceptions import DDGSException
+
+    timelimit = {"day": "d", "week": "w", "month": "m", "year": "y"}.get(time_range or "")
+
+    def run() -> list[dict[str, Any]]:
+        return DDGS(timeout=int(DEFAULT_TIMEOUT)).text(query, max_results=max_results, timelimit=timelimit)
+
+    # DuckDuckGo fails intermittently ("No results found", rate limits): one retry after a short pause.
+    for attempt in range(2):
+        try:
+            results = await asyncio.to_thread(run)
+            break
+        except DDGSException as e:
+            if attempt == 1:
+                raise WebToolError(
+                    f"DuckDuckGo search failed ({e}); retry, rephrase, or run SearXNG (mafx infra up)"
+                ) from e
+            await asyncio.sleep(1.5)
+    return [
+        {
+            "title": r.get("title", ""),
+            "url": r.get("href", ""),
+            "snippet": (r.get("body") or "")[:500],
+            "published": None,
+            "engines": ["duckduckgo"],
         }
         for r in results[:max_results]
     ]
