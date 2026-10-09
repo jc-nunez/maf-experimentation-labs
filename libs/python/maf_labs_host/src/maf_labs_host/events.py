@@ -23,6 +23,10 @@ EXECUTOR_STARTED = "executor_started"
 EXECUTOR_COMPLETED = "executor_completed"
 WORKFLOW_OUTPUT = "workflow_output"
 REQUEST_INFO = "request_info"
+APPROVAL_REQUEST = "approval_request"
+APPROVAL_DECISION = "approval_decision"
+# Decisions a host accepts for an approval request.
+APPROVAL_CHOICES = ("approve", "deny", "always", "always_args")
 WARNING = "warning"
 ERROR = "error"
 TURN_COMPLETED = "turn_completed"
@@ -80,6 +84,7 @@ class UpdateTranslator:
         self.output_tokens = 0
         self.model_calls = 0
         self.tool_calls = 0
+        self.approval_requests: list[Any] = []  # framework Content objects, answered via Runner.approve
 
     def _ev(self, type_: str, **data: Any) -> dict[str, Any]:
         if self.executor_id is not None:
@@ -144,10 +149,16 @@ class UpdateTranslator:
                 out.append(self._ev(USAGE, input_tokens=inp, output_tokens=outp))
             elif ctype == "error":
                 out.append(self._ev(ERROR, message=content.message or "error", code=content.error_code))
-            elif ctype in ("function_approval_request",):
+            elif ctype == "function_approval_request":
+                self.approval_requests.append(content)
+                call = content.function_call
                 out.append(
                     self._ev(
-                        REQUEST_INFO, request_id=content.id, kind="approval", data=to_jsonable(content.function_call)
+                        APPROVAL_REQUEST,
+                        request_id=content.id,
+                        call_id=getattr(call, "call_id", None),
+                        name=getattr(call, "name", None),
+                        arguments=parse_json(getattr(call, "arguments", None) or "{}"),
                     )
                 )
         return out

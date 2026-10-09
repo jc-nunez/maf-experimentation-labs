@@ -36,6 +36,14 @@ class Runner:
         """Override the reasoning effort for the following turns (None restores the configured default)."""
         raise NotImplementedError(f"{type(self).__name__} does not support changing the reasoning effort")
 
+    def approve(self, decisions: dict[str, str]) -> AsyncIterator[dict[str, Any]]:  # pragma: no cover - interface
+        """Answer the approval requests listed in the last ``turn_completed`` (``pending_approvals``) and continue.
+
+        ``decisions`` maps request ids to one of ``approve``, ``deny``, ``always`` (this tool, any arguments) or
+        ``always_args`` (this tool with these arguments). Requests left out are denied.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not relay tool approvals")
+
     def describe(self) -> dict[str, Any]:
         return self.info
 
@@ -51,6 +59,7 @@ class AgentRunner(Runner):
         self.session: Any = None
         self.tools: list[Any] = []
         self.effort_override: str | None = ctx.reasoning_effort
+        self.pending: list[Any] = []  # approval requests from the last turn
         self._stack = contextlib.AsyncExitStack()
         self.info = {
             "target": self.target,
@@ -84,16 +93,51 @@ class AgentRunner(Runner):
 
     async def reset(self) -> None:
         self.session = self.agent.create_session()
+        self.pending = []
 
     async def close(self) -> None:
         await self._stack.aclose()
 
-    async def turn(self, text: str) -> AsyncIterator[dict[str, Any]]:
+    def turn(self, text: str) -> AsyncIterator[dict[str, Any]]:
+        return self._run(text)
+
+    def approve(self, decisions: dict[str, str]) -> AsyncIterator[dict[str, Any]]:
+        from agent_framework import (
+            Message,
+            create_always_approve_tool_response,
+            create_always_approve_tool_with_arguments_response,
+        )
+
+        responses = []
+        decided: list[dict[str, Any]] = []
+        for request in self.pending:
+            decision = decisions.get(request.id, "deny")
+            if decision not in ev.APPROVAL_CHOICES:
+                raise ValueError(f"unknown approval decision '{decision}' (choose {', '.join(ev.APPROVAL_CHOICES)})")
+            if decision == "always":
+                responses.append(create_always_approve_tool_response(request, reason="Approved for this session"))
+            elif decision == "always_args":
+                responses.append(
+                    create_always_approve_tool_with_arguments_response(request, reason="Approved for these arguments")
+                )
+            else:
+                responses.append(request.to_function_approval_response(approved=decision == "approve"))
+            decided.append({"request_id": request.id, "name": request.function_call.name, "decision": decision})
+        if not responses:
+            raise ValueError("there are no pending approval requests")
+        self.pending = []
+        return self._run(Message(role="user", contents=responses), decided)
+
+    async def _run(self, message: Any, decided: list[dict[str, Any]] | None = None) -> AsyncIterator[dict[str, Any]]:
         started = time.perf_counter()
         tr = ev.UpdateTranslator()
+        for d in decided or []:
+            yield ev.event(ev.APPROVAL_DECISION, **d)
         try:
             options = {"reasoning": {"effort": self.effort_override}} if self.effort_override else None
-            stream = self.agent.run(text, stream=True, session=self.session, tools=self.tools or None, options=options)
+            stream = self.agent.run(
+                message, stream=True, session=self.session, tools=self.tools or None, options=options
+            )
             async for update in stream:
                 for e in tr.translate(update):
                     yield e
@@ -105,7 +149,17 @@ class AgentRunner(Runner):
             yield ev.event(ev.ERROR, message=f"{type(exc).__name__}: {exc}")
             yield _turn_completed(tr, started, ok=False)
             return
-        yield _turn_completed(tr, started)
+        self.pending = tr.approval_requests
+        done = _turn_completed(tr, started)
+        done["pending_approvals"] = [
+            {
+                "request_id": r.id,
+                "name": r.function_call.name,
+                "arguments": ev.parse_json(r.function_call.arguments or "{}"),
+            }
+            for r in self.pending
+        ]
+        yield done
 
 
 class WorkflowRunner(Runner):
@@ -311,6 +365,12 @@ class RecordingRunner(Runner):
     async def close(self) -> None:
         await self.inner.close()
         self.trace.close()
+
+    async def approve(self, decisions: dict[str, str]) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override]
+        self.trace.write(ev.event("approval_response", decisions=decisions))
+        async for e in self.inner.approve(decisions):
+            self.trace.write(e)
+            yield e
 
     async def set_effort(self, effort: str | None) -> None:
         await self.inner.set_effort(effort)

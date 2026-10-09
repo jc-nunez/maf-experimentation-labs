@@ -169,6 +169,7 @@ class Renderer:
         self._stream: StreamBlock | None = None
         self._folded: list[str] = []  # reasoning collected in "normal" view, shown as one line
         self._calls: dict[str, dict[str, Any]] = {}
+        self._paused: dict[str, float] = {}  # totals of turn parts that stopped for approvals
         self._blank = False  # was the last line printed blank? (start with a gap after the header/prompt)
 
     # ------------------------------------------------------------------------------------------ helpers
@@ -317,6 +318,26 @@ class Renderer:
                 self._body("error  ", e["error"], style="red")
             else:
                 self._body("result ", e.get("result"))
+        elif t == "approval_request":
+            self._gap()
+            self._print(
+                Text("🔐 ", style="yellow")
+                + Text(f"{prefix}{e.get('name')}", style="bold yellow")
+                + Text("  needs approval", style="yellow")
+            )
+            self._body("args   ", e.get("arguments"))
+        elif t == "approval_decision":
+            ok = e.get("decision") != "deny"
+            labels = {
+                "approve": "approved",
+                "always": "approved for this session",
+                "always_args": "approved for these arguments",
+                "deny": "denied",
+            }
+            self._print(
+                Text("✓ " if ok else "✗ ", style="green" if ok else "red")
+                + Text(f"{e.get('name')} {labels.get(e.get('decision'), e.get('decision'))}", style="dim")
+            )
         elif t == "executor_started":
             self._gap()
             self.console.rule(Text(f"▶ {executor}", style="bold cyan"), align="left", style="cyan")
@@ -346,6 +367,16 @@ class Renderer:
             self._gap()
             self._print(Text(f"✗ {prefix}{e.get('message')}", style="bold red"))
         elif t == "turn_completed":
+            keys = ("model_calls", "tool_calls", "input_tokens", "output_tokens", "duration_s")
+            if e.get("pending_approvals"):
+                # Not the end of the turn: it continues after the approval decisions. Summarise once, at the end.
+                for k in keys:
+                    self._paused[k] = self._paused.get(k, 0) + (e.get(k) or 0)
+                return
+            if self._paused:
+                e = {**e, **{k: (e.get(k) or 0) + self._paused.get(k, 0) for k in keys}}
+                e["duration_s"] = round(e["duration_s"], 3)
+                self._paused = {}
             self._gap()
             ok = e.get("ok")
             summary = (

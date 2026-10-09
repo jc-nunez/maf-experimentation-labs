@@ -19,6 +19,8 @@ Agents built on the Agent Framework **harness**: `create_harness_agent` (Python)
 |---|---|---|
 | `claw` | python | `create_harness_agent` with the `get_stock_price` tool, web tools, file memory, and an execute-mode loop (`todos_remaining`) |
 | `researcher` | python | Port of the official `harness_research.py`: plans research as todos, then searches and reads sources with the web tools |
+| `analyst` | python | Port of the official `harness_data_processing.py`: file access over a working copy of `data/`. Reads are auto-approved; writes ask for approval |
+| `analyst-dotnet` | dotnet | The same analyst on `HarnessAgent` (`FileAccessStore`, `DisableReadOnlyToolApproval`) |
 | `claw-dotnet` | dotnet | `AsHarnessAgent(new HarnessAgentOptions { … })` with the same instructions and tool |
 | `get-stock-price` | python tool | mock prices (same price book as the official sample) |
 | `web` | shared tool pack | `web_search` (SearXNG) and `fetch_url` (page → markdown), from `tools/python/web-search` |
@@ -41,5 +43,13 @@ The harness's own tools show up in the trajectory, so you can follow its plannin
 - **Context window:** compaction is sized for Qwen3.8-Flash-Next (262K context, 16K output).
 - **SGLang reasoning replay:** the harness persists history after every model call and tags compacted reasoning groups. The `sglang` provider strips reasoning and those tags at the request layer (`SGLangResponsesClient`); see `docs/providers.md`.
 
-Not covered yet: tools that need approval, such as the harness file-access tools (`file_access_store`). The hosts
-don't relay approval requests yet.
+## Tool approvals
+The analysts work on a copy of `data/` under `.mafx/work/harness-lab/<agent>/`, so their writes never touch the repo.
+When an analyst wants to write a file, the turn pauses:
+- **In a session:** `mafx` asks: `y` approve, `a` always for this tool, `A` always with these args, `n` deny.
+- **With `-p`:** pass `--allow-tool file_access_write` or `--yes`. Otherwise the write is denied and the agent is told.
+
+```bash
+mafx run harness-lab/analyst
+mafx run harness-lab/analyst --allow-tool file_access_write -p "Revenue per region from sales.csv; write it to region_totals.md"
+```

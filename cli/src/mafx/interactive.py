@@ -8,6 +8,7 @@ import signal
 from pathlib import Path
 from typing import Any
 
+from maf_labs_host.approvals import drive
 from maf_labs_host.runner import Runner
 from prompt_toolkit.application import Application, get_app
 from prompt_toolkit.completion import WordCompleter
@@ -47,6 +48,7 @@ STYLE = Style.from_dict(
         "prompt": "ansicyan bold",
         "frame.border": "ansibrightblack",
         "toolbar": "ansibrightblack",
+        "approval": "ansiyellow bold",
         "toolbar.key": "ansibrightblack bold",
         "completion-menu": "bg:ansibrightblack ansiwhite",
         "completion-menu.completion.current": "bg:ansicyan ansiblack",
@@ -136,13 +138,66 @@ class InputBox:
         return await self.app.run_async()
 
 
+APPROVAL_KEYS = {"y": "approve", "a": "always", "A": "always_args", "n": "deny"}
+
+
+async def ask_approval(tool: str) -> str:
+    """Single-key approval prompt: y approve · a always (tool) · A always (these args) · n deny. Ctrl+C denies."""
+    kb = KeyBindings()
+
+    for key, decision in APPROVAL_KEYS.items():
+
+        @kb.add(key)
+        def _choose(event: Any, decision: str = decision) -> None:
+            event.app.exit(result=decision)
+
+    @kb.add("enter")
+    def _default(event: Any) -> None:
+        event.app.exit(result="approve")
+
+    @kb.add("c-c")
+    @kb.add("escape")
+    def _deny(event: Any) -> None:
+        event.app.exit(result="deny")
+
+    question = [
+        ("class:approval", f"    Allow {tool}? "),
+        ("class:toolbar.key", "y"),
+        ("class:toolbar", " yes (⏎) · "),
+        ("class:toolbar.key", "a"),
+        ("class:toolbar", " always for this tool · "),
+        ("class:toolbar.key", "A"),
+        ("class:toolbar", " always with these args · "),
+        ("class:toolbar.key", "n"),
+        ("class:toolbar", " no"),
+    ]
+    app: Application[str] = Application(
+        layout=Layout(Window(FormattedTextControl(question), height=1)),
+        key_bindings=kb,
+        style=STYLE,
+        full_screen=False,
+        erase_when_done=True,
+    )
+    return await app.run_async()
+
+
 def _turns(n: int) -> str:
     return f"{n} turn" if n == 1 else f"{n} turns"
 
 
 class Session:
-    def __init__(self, runner: Runner, console: Console, view: str, history_dir: Path) -> None:
+    def __init__(
+        self,
+        runner: Runner,
+        console: Console,
+        view: str,
+        history_dir: Path,
+        approve_all: bool = False,
+        allow_tools: list[str] | None = None,
+    ) -> None:
         self.runner = runner
+        self.approve_all = approve_all
+        self.allow_tools = set(allow_tools or [])
         self.console = console
         self.view = view
         self.last_prompt: str | None = None
@@ -189,10 +244,11 @@ class Session:
         renderer = Renderer(self.console, view=self.view)
 
         async def consume() -> None:
-            async for e in self.runner.turn(text):
+            async for e in drive(self.runner, self.runner.turn(text), self._decide):
                 renderer.handle(e)
                 if e["type"] == "turn_completed":
-                    self.turns += 1
+                    if not e.get("pending_approvals"):
+                        self.turns += 1
                     self.tokens_in += e.get("input_tokens", 0)
                     self.tokens_out += e.get("output_tokens", 0)
 
@@ -209,6 +265,19 @@ class Session:
             renderer.finish()
             with contextlib.suppress(NotImplementedError, RuntimeError):
                 loop.remove_signal_handler(signal.SIGINT)
+
+    async def _decide(self, pending: list[dict[str, Any]]) -> dict[str, str]:
+        """Ask about each tool call waiting for approval (the request itself was already rendered)."""
+        decisions: dict[str, str] = {}
+        for request in pending:
+            if self.approve_all or request["name"] in self.allow_tools:
+                decisions[request["request_id"]] = "approve"
+                continue
+            answer = await ask_approval(request["name"])
+            decisions[request["request_id"]] = answer
+            if answer == "always":
+                self.allow_tools.add(request["name"])
+        return decisions
 
     async def _command(self, line: str) -> bool:
         """Handle a slash command. Returns False to exit."""

@@ -123,8 +123,17 @@ class DotnetRunner(Runner):
         if self._stderr_task:
             self._stderr_task.cancel()
 
+    async def approve(self, decisions: dict[str, str]) -> AsyncIterator[dict[str, Any]]:  # type: ignore[override]
+        await self._send({"type": "approve", "decisions": decisions})
+        async for e in self._until_turn_completed():
+            yield e
+
     async def turn(self, text: str) -> AsyncIterator[dict[str, Any]]:
         await self._send({"type": "user", "text": text})
+        async for e in self._until_turn_completed():
+            yield e
+
+    async def _until_turn_completed(self) -> AsyncIterator[dict[str, Any]]:
         while True:
             msg = await self._read()
             if msg is None:

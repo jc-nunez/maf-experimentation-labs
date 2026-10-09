@@ -97,11 +97,19 @@ public sealed class MafLabsHost
     private async Task<int> RunOnceAsync(AgentRunner runner, string prompt)
     {
         var events = new List<JsonObject>();
-        await foreach (var e in runner.TurnAsync(prompt))
+        var stream = runner.TurnAsync(prompt);
+        for (var round = 0; round <= 25; round++)
         {
-            events.Add(e);
-            if (Options.Output == "jsonl") Console.WriteLine(e.ToJsonString());
-            else if (Options.Output == "text" && !Options.Quiet) Plain(e);
+            await foreach (var e in stream)
+            {
+                events.Add(e);
+                if (Options.Output == "jsonl") Console.WriteLine(e.ToJsonString());
+                else if (Options.Output == "text" && !Options.Quiet) Plain(e);
+            }
+            if (runner.Pending.Count == 0) break;
+            // Standalone -p: approve everything with --yes, otherwise deny (mafx relays decisions itself).
+            var decision = Options.Yes ? "approve" : "deny";
+            stream = runner.ApproveAsync(runner.Pending.ToDictionary(r => r.RequestId, _ => decision));
         }
         var done = events.LastOrDefault() ?? new JsonObject();
         if (Options.Output == "text") Console.WriteLine((done["text"]?.GetValue<string>() ?? "").Trim());
@@ -154,6 +162,14 @@ public sealed class MafLabsHost
                     await runner.ResetAsync();
                     Send(Events.Create("reset_done"));
                     break;
+                case "approve":
+                    var decisions = new Dictionary<string, string>();
+                    if (msg["decisions"] is JsonObject map)
+                    {
+                        foreach (var (id, value) in map) decisions[id] = value?.GetValue<string>() ?? "deny";
+                    }
+                    await foreach (var e in runner.ApproveAsync(decisions)) Send(e);
+                    break;
                 case "set_effort":
                     var requested = msg["effort"]?.GetValue<string>();
                     try
@@ -186,6 +202,8 @@ public sealed class MafLabsHost
             case "reasoning_delta": err.Write(e["text"]!.GetValue<string>()); break;
             case "tool_call": err.WriteLine($"\n⏺ {e["name"]}({e["arguments"]?.ToJsonString()})  [{e["call_id"]}]"); break;
             case "tool_result": err.WriteLine($"  ⎿ {(e["error"] is { } x ? x.ToString() : e["result"]?.ToJsonString())}"); break;
+            case "approval_request": err.WriteLine($"\n🔐 approval needed: {e["name"]}({e["arguments"]?.ToJsonString()})"); break;
+            case "approval_decision": err.WriteLine($"  {e["decision"]}: {e["name"]}"); break;
             case "error": err.WriteLine($"\nerror: {e["message"]}"); break;
             case "turn_completed":
                 err.WriteLine($"\n── {e["model_calls"]} model calls · {e["tool_calls"]} tool calls · in {e["input_tokens"]} / out {e["output_tokens"]} tok · {e["duration_s"]}s ──");
@@ -223,15 +241,51 @@ internal sealed class AgentRunner(AIAgent agent, string name, ProviderInfo provi
         ["instructions"] = agent.GetService<ChatClientAgent>()?.Instructions,
     };
 
-    public async Task ResetAsync() => _session = await agent.CreateSessionAsync();
+    /// <summary>Approval requests from the last turn.</summary>
+    public List<ToolApprovalRequestContent> Pending { get; private set; } = [];
 
-    public async IAsyncEnumerable<JsonObject> TurnAsync(string text)
+    public async Task ResetAsync()
     {
+        _session = await agent.CreateSessionAsync();
+        Pending = [];
+    }
+
+    public IAsyncEnumerable<JsonObject> TurnAsync(string text) => RunAsync(new ChatMessage(ChatRole.User, text), []);
+
+    /// <summary>
+    /// Answers the pending approval requests (approve | deny | always | always_args; missing ids are denied)
+    /// and continues the turn.
+    /// </summary>
+    public IAsyncEnumerable<JsonObject> ApproveAsync(IReadOnlyDictionary<string, string> decisions)
+    {
+        var responses = new List<AIContent>();
+        var decided = new List<JsonObject>();
+        foreach (var request in Pending)
+        {
+            var decision = decisions.TryGetValue(request.RequestId, out var d) ? d : "deny";
+            responses.Add(decision switch
+            {
+                "approve" => request.CreateResponse(approved: true, reason: "User approved"),
+                "always" => request.CreateAlwaysApproveToolResponse("Approved for this session"),
+                "always_args" => request.CreateAlwaysApproveToolWithArgumentsResponse("Approved for these arguments"),
+                "deny" => request.CreateResponse(approved: false, reason: "User denied"),
+                _ => throw new ArgumentException($"unknown approval decision '{decision}'"),
+            });
+            decided.Add(Events.Create("approval_decision", ("request_id", request.RequestId),
+                ("name", (request.ToolCall as FunctionCallContent)?.Name), ("decision", decision)));
+        }
+        Pending = [];
+        return RunAsync(new ChatMessage(ChatRole.User, responses), decided);
+    }
+
+    private async IAsyncEnumerable<JsonObject> RunAsync(ChatMessage message, List<JsonObject> preamble)
+    {
+        foreach (var e in preamble) yield return e;
         var sw = Stopwatch.StartNew();
         var tr = new UpdateTranslator();
         var events = new List<JsonObject>();
         var ok = true;
-        await using var updates = agent.RunStreamingAsync(text, _session).GetAsyncEnumerator();
+        await using var updates = agent.RunStreamingAsync(message, _session).GetAsyncEnumerator();
         while (true)
         {
             AgentResponseUpdate update;
@@ -250,6 +304,7 @@ internal sealed class AgentRunner(AIAgent agent, string name, ProviderInfo provi
             foreach (var e in tr.Translate(update)) yield return e;
         }
         foreach (var e in events) yield return e;
+        Pending = tr.ApprovalRequests;
         yield return tr.Completed(sw, ok);
     }
 }

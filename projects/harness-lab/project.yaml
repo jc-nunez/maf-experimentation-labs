@@ -21,8 +21,20 @@ components:
       tools: [web]
       # no reasoning_effort: research uses the server default (xhigh)
 
+    - name: analyst
+      description: Data analyst with file access over data/ (port of harness_data_processing.py); writes need approval
+      runtime: python
+      entry: harness_lab.agents.analyst:create_agent
+      reasoning_effort: medium
+
     - name: claw-dotnet
       description: Same assistant on the .NET HarnessAgent (AsHarnessAgent)
+      runtime: dotnet
+      project: dotnet/HarnessLab/HarnessLab.csproj
+      reasoning_effort: medium
+
+    - name: analyst-dotnet
+      description: Same data analyst on the .NET HarnessAgent (file access; writes need approval)
       runtime: dotnet
       project: dotnet/HarnessLab/HarnessLab.csproj
       reasoning_effort: medium

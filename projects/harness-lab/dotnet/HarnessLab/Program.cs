@@ -32,11 +32,12 @@ const string Instructions = """
 
 var memoryRoot = Path.Combine(host.WorkspaceRoot ?? Directory.GetCurrentDirectory(), ".mafx", "memory", "harness-lab");
 
+// Registration names match the manifest component names so mafx can select each agent.
 host.AddAgent(
-    "claw",
+    "claw-dotnet",
     client => client.AsHarnessAgent(new HarnessAgentOptions
     {
-        Name = "claw",
+        Name = "claw-dotnet",
         Description = "Personal finance assistant with planning, todos and file memory",
         ChatOptions = new ChatOptions
         {
@@ -54,4 +55,50 @@ host.AddAgent(
     description: "Personal finance assistant on HarnessAgent",
     toolNames: ["get_stock_price"]);
 
+// .NET port of the official data-processing sample: file access over a working copy of data/.
+// Reads are auto-approved; writes, replaces and deletes need approval (relayed by mafx).
+const string AnalystInstructions = """
+    You are a data analyst assistant. You have access to a folder of data files via the file access tools.
+    Start by listing the available files, read the relevant ones before answering, and show your analysis
+    clearly with tables and key insights. When asked to produce output files, write them (CSV for tabular data,
+    Markdown for reports) and confirm what you wrote. Never modify or delete the original input data files
+    unless explicitly asked to.
+    """;
+
+host.AddAgent(
+    "analyst-dotnet",
+    client => client.AsHarnessAgent(new HarnessAgentOptions
+    {
+        Name = "analyst-dotnet",
+        Description = "Data analyst with file access; writes need approval",
+        ChatOptions = new ChatOptions { Instructions = AnalystInstructions },
+        MaxContextWindowTokens = 262_144,
+        MaxOutputTokens = 16_384,
+        DisableWebSearch = true,
+        DisableTodoProvider = true,
+        DisableAgentModeProvider = true,
+        FileAccessStore = new FileSystemAgentFileStore(AnalystWorkingDir(host.WorkspaceRoot)),
+        FileAccessProviderOptions = new FileAccessProviderOptions { DisableReadOnlyToolApproval = true },
+    }),
+    description: "Data analyst on HarnessAgent with file access (writes need approval)");
+
 return await host.RunAsync();
+
+// Working copy of the project's data/ folder under .mafx/ (gitignored), so writes never touch the repo.
+static string AnalystWorkingDir(string? workspaceRoot)
+{
+    var projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../.."));
+    var seed = Path.Combine(Directory.GetCurrentDirectory(), "data");
+    if (!Directory.Exists(seed)) seed = Path.Combine(projectRoot, "data");
+    var work = Path.Combine(workspaceRoot ?? Directory.GetCurrentDirectory(), ".mafx", "work", "harness-lab", "analyst-dotnet");
+    Directory.CreateDirectory(work);
+    if (Directory.Exists(seed))
+    {
+        foreach (var file in Directory.GetFiles(seed))
+        {
+            var target = Path.Combine(work, Path.GetFileName(file));
+            if (!File.Exists(target)) File.Copy(file, target);
+        }
+    }
+    return work;
+}

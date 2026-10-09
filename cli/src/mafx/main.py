@@ -9,10 +9,11 @@ import shutil
 import sys
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import typer
 from maf_labs_host import events as ev
+from maf_labs_host.approvals import drive, policy
 from maf_labs_host.manifest import MANIFEST, REASONING_EFFORTS, load_project
 from maf_labs_host.providers import (
     PROVIDERS,
@@ -85,9 +86,15 @@ def run(
     quiet: bool = typer.Option(False, "--quiet", "-q", help="-p text mode: only print the answer"),
     no_trace: bool = typer.Option(False, "--no-trace", help="do not record .mafx/runs/<id>/trace.jsonl"),
     no_build: bool = typer.Option(False, "--no-build", help="dotnet: skip the build step"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="approve every tool call that needs approval"),
+    allow_tool: Annotated[
+        list[str] | None,
+        typer.Option("--allow-tool", help="approve this tool without asking (repeatable); others: ask / deny with -p"),
+    ] = None,
 ) -> None:
     """Run an agent or workflow. With [bold]-p[/] it runs once and exits; without it starts a session."""
     _silence_framework_logs()
+    allow_tool = allow_tool or []
     ws = _ws()
     try:
         tgt = targets.resolve(ws, target)
@@ -115,9 +122,11 @@ def run(
 
                 if not sys.stdin.isatty():
                     _fail("interactive mode needs a terminal; use -p for scripts")
-                await Session(runner, out, view, ws.root / ".mafx" / "history").run()
+                await Session(
+                    runner, out, view, ws.root / ".mafx" / "history", approve_all=yes, allow_tools=allow_tool
+                ).run()
                 return 0
-            return await _run_once(runner, prompt, output, view, plain, quiet)
+            return await _run_once(runner, prompt, output, view, plain, quiet, policy(yes, allow_tool))
         finally:
             await runner.close()
 
@@ -134,13 +143,13 @@ def run(
     raise typer.Exit(code)
 
 
-async def _run_once(runner, prompt: str, output: str, view: str, plain: bool, quiet: bool) -> int:
+async def _run_once(runner, prompt: str, output: str, view: str, plain: bool, quiet: bool, decide: Any) -> int:
     collected: list[dict[str, Any]] = []
     renderer = None
     if output == "text" and not quiet:
         print_info(err, runner.info)
         renderer = Renderer(err, view=view, markdown=not plain, show_text=False)
-    async for e in runner.turn(prompt):
+    async for e in drive(runner, runner.turn(prompt), decide):
         collected.append(e)
         if output == "jsonl":
             print(json.dumps(e, default=str), flush=True)

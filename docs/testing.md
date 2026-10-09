@@ -34,6 +34,13 @@ mafx run harness-lab/claw -p "Make a todo per ticker (MSFT, NVDA) to get its pri
 mafx run harness-lab/claw-dotnet -p "My watchlist is MSFT and NVDA. Which is cheaper?"
 ls .mafx/memory/harness-lab/              # one folder of memory files per session
 
+# Tool approvals (data analyst with file access; writes need approval)
+mafx run harness-lab/analyst                       # ask it to write a report; answer y / a / A / n
+mafx run harness-lab/analyst -p "Write hello to hello.md"                                   # denied (default with -p)
+mafx run harness-lab/analyst --allow-tool file_access_write -p "Write hello to hello.md"     # approved
+mafx run harness-lab/analyst-dotnet -y -p "Write hello to hello.md"                         # .NET, approve all
+ls .mafx/work/harness-lab/analyst/
+
 # Web search (needs SEARXNG_URL)
 mafx tool inspect harness-lab/web
 mafx tool run harness-lab/web -a '{"_function":"web_search","query":"SGLang responses API","max_results":3}'

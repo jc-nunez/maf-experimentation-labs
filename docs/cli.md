@@ -26,6 +26,8 @@ looking upward for `maf-labs.yaml`; set `MAFX_HOME` to use it from anywhere.
 - `-q`: print only the answer.
 - `--no-trace`: don't record the run.
 - `--no-build`: skip the build step for .NET components.
+- `--yes` (`-y`): approve every tool call that needs approval.
+- `--allow-tool NAME`: approve that tool without asking (repeatable). Other requests are asked about in a session and denied with `-p`.
 
 Targets can be written as `project/name`, as `project` (uses the first agent), or as `name` (inside a project
 folder, or when the name is unique across the workspace).
@@ -41,6 +43,11 @@ folder, or when the name is unique across the workspace).
   - `/effort none|low|medium|xhigh|default`: change the reasoning effort for the following turns
   - `/trace`: show the trace file path
   - `/clear`, `/exit`
+- **Tool approvals:** when a tool needs approval, the session shows the call and asks once per request:
+  - `y` or ⏎: approve this call.
+  - `a`: always approve this tool for the session.
+  - `A`: always approve it with these exact arguments.
+  - `n`, Esc or Ctrl+C: deny.
 - **History** is saved per target in `.mafx/history/`.
 
 Set `MAFX_DEBUG=1` to get full tracebacks.

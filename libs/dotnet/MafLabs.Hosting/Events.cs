@@ -46,6 +46,9 @@ public sealed class UpdateTranslator
     public int ToolCalls { get; private set; }
     public string Text => _text.ToString();
 
+    /// <summary>Tool calls waiting for approval in this turn (answered through AgentRunner.ApproveAsync).</summary>
+    public List<ToolApprovalRequestContent> ApprovalRequests { get; } = [];
+
     public IEnumerable<JsonObject> Translate(AgentResponseUpdate update)
     {
         foreach (var content in update.Contents)
@@ -77,6 +80,13 @@ public sealed class UpdateTranslator
                     yield return Events.Create("usage", ("input_tokens", usage.Details.InputTokenCount ?? 0),
                         ("output_tokens", usage.Details.OutputTokenCount ?? 0));
                     break;
+                case ToolApprovalRequestContent approval:
+                    ApprovalRequests.Add(approval);
+                    var approvalCall = approval.ToolCall as FunctionCallContent;
+                    yield return Events.Create("approval_request", ("request_id", approval.RequestId),
+                        ("call_id", approval.ToolCall.CallId), ("name", approvalCall?.Name),
+                        ("arguments", Events.ToNode(approvalCall?.Arguments) ?? new JsonObject()));
+                    break;
                 case ErrorContent error:
                     yield return Events.Create("error", ("message", error.Message), ("code", error.ErrorCode));
                     break;
@@ -87,5 +97,11 @@ public sealed class UpdateTranslator
     public JsonObject Completed(Stopwatch elapsed, bool ok) => Events.Create("turn_completed",
         ("ok", ok), ("text", Text), ("duration_s", Math.Round(elapsed.Elapsed.TotalSeconds, 3)),
         ("input_tokens", InputTokens), ("output_tokens", OutputTokens),
-        ("model_calls", ModelCalls), ("tool_calls", ToolCalls));
+        ("model_calls", ModelCalls), ("tool_calls", ToolCalls),
+        ("pending_approvals", new JsonArray(ApprovalRequests.Select(r => (JsonNode)new JsonObject
+        {
+            ["request_id"] = r.RequestId,
+            ["name"] = (r.ToolCall as FunctionCallContent)?.Name,
+            ["arguments"] = Events.ToNode((r.ToolCall as FunctionCallContent)?.Arguments) ?? new JsonObject(),
+        }).ToArray())));
 }

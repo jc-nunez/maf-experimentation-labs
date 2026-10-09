@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from . import events as ev
+from .approvals import drive, policy
 from .manifest import REASONING_EFFORTS, Project, find_project_dir, load_project
 from .runner import RecordingRunner, Runner, create_runner
 from .workspace import WorkspaceNotFound, find_workspace, load_env
@@ -36,6 +37,10 @@ def build_parser(prog: str | None = None) -> argparse.ArgumentParser:
     p.add_argument("--stdio", action="store_true", help="speak the JSONL host protocol on stdin/stdout")
     p.add_argument("--list", action="store_true", help="list components and exit")
     p.add_argument("--quiet", action="store_true", help="text mode: do not print the trajectory to stderr")
+    p.add_argument("-y", "--yes", action="store_true", help="-p: approve every tool call that needs approval")
+    p.add_argument(
+        "--allow-tool", action="append", default=[], metavar="NAME", help="-p: approve this tool (repeatable)"
+    )
     p.add_argument("--no-trace", action="store_true", help="do not write .mafx/runs/<id>/trace.jsonl")
     return p
 
@@ -52,6 +57,10 @@ def _plain(event: dict[str, Any], out: Any) -> None:
         out.write(f"  ⎿ {body}\n")
     elif t == ev.EXECUTOR_STARTED:
         out.write(f"\n▶ {event['executor_id']}\n")
+    elif t == ev.APPROVAL_REQUEST:
+        out.write(f"\n🔐 approval needed: {event['name']}({json.dumps(event['arguments'])})\n")
+    elif t == ev.APPROVAL_DECISION:
+        out.write(f"  {event['decision']}: {event['name']}\n")
     elif t == ev.REQUEST_INFO:
         out.write(f"\n? input requested ({event.get('request_id')}): {event.get('data')}\n")
     elif t in (ev.ERROR, ev.WARNING):
@@ -64,9 +73,9 @@ def _plain(event: dict[str, Any], out: Any) -> None:
     out.flush()
 
 
-async def _run_once(runner: Runner, prompt: str, output: str, quiet: bool) -> int:
+async def _run_once(runner: Runner, prompt: str, output: str, quiet: bool, decide: Any) -> int:
     collected: list[dict[str, Any]] = []
-    async for e in runner.turn(prompt):
+    async for e in drive(runner, runner.turn(prompt), decide):
         collected.append(e)
         if output == "jsonl":
             print(json.dumps(e, default=str), flush=True)
@@ -133,6 +142,25 @@ async def serve_stdio(runner: Runner) -> int:
         elif mtype == "user":
             async for e in runner.turn(msg.get("text", "")):
                 send(e)
+        elif mtype == "approve":
+            try:
+                async for e in runner.approve(msg.get("decisions") or {}):
+                    send(e)
+            except (ValueError, NotImplementedError) as exc:
+                send(ev.event(ev.ERROR, message=str(exc)))
+                send(
+                    ev.event(
+                        ev.TURN_COMPLETED,
+                        ok=False,
+                        text="",
+                        duration_s=0,
+                        input_tokens=0,
+                        output_tokens=0,
+                        model_calls=0,
+                        tool_calls=0,
+                        pending_approvals=[],
+                    )
+                )
         elif mtype == "set_effort":
             try:
                 await runner.set_effort(msg.get("effort"))
@@ -176,7 +204,7 @@ async def _amain(project: Project, args: argparse.Namespace) -> int:
             return await serve_stdio(runner)
         if args.prompt is not None:
             prompt = sys.stdin.read() if args.prompt == "-" else args.prompt
-            return await _run_once(runner, prompt, args.output, args.quiet)
+            return await _run_once(runner, prompt, args.output, args.quiet, policy(args.yes, args.allow_tool))
         return await _interactive(runner)
     finally:
         await runner.close()
