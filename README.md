@@ -86,6 +86,11 @@ dotnet run --project projects/hello-world/dotnet/HelloWorld -- -p "hi"
 dotnet run projects/hello-world/dotnet/apps/greeter.cs -- -p "hi"  # .NET 10 single-file app
 ```
 
+## Trying things out
+
+[docs/testing.md](docs/testing.md) lists `mafx` commands for every use case: each runtime, workflows, tools,
+output modes, sessions, traces, provider variants and scaffolding.
+
 ## Tests
 
 ```bash

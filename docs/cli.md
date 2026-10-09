@@ -42,3 +42,5 @@ folder, or when the name is unique across the workspace).
 - **History** is saved per target in `.mafx/history/`.
 
 Set `MAFX_DEBUG=1` to get full tracebacks.
+
+For a hands-on walkthrough of every use case, see [testing.md](testing.md).
