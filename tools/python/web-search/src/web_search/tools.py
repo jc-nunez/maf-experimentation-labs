@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import json
 import os
 import socket
 from typing import Annotated, Any, Literal
@@ -19,8 +20,10 @@ from agent_framework import tool
 from pydantic import Field
 
 USER_AGENT = "maf-labs-web-tools/0.1 (+https://github.com/jc-nunez/maf-experimentation-labs)"
-DEFAULT_TIMEOUT = 20.0
-MAX_FETCH_BYTES = 5_000_000
+DEFAULT_TIMEOUT = 20.0  # per connect/read
+OVERALL_TIMEOUT = 45.0  # whole call, so a slow-drip server cannot hold the agent indefinitely
+MAX_FETCH_BYTES = 2_000_000  # page bytes read (HTML extraction is CPU-bound, keep it bounded)
+MAX_SEARCH_BYTES = 2_000_000
 
 # Tests inject an httpx.MockTransport here; None means real network connections.
 _transport: httpx.AsyncBaseTransport | None = None
@@ -53,14 +56,12 @@ async def web_search(
     params: dict[str, Any] = {"q": query, "format": "json"}
     if time_range:
         params["time_range"] = time_range
-    async with httpx.AsyncClient(
-        timeout=DEFAULT_TIMEOUT, headers={"User-Agent": USER_AGENT}, transport=_transport
-    ) as client:
-        response = await client.get(f"{base_url}/search", params=params)
-    if response.status_code == 403:
+    status, body = await _deadline(_search(f"{base_url}/search", params))
+    if status == 403:
         raise WebToolError("SearXNG refused the JSON API (enable `search.formats: [html, json]` in settings.yml)")
-    response.raise_for_status()
-    results = response.json().get("results", [])
+    if status >= 400:
+        raise WebToolError(f"SearXNG returned HTTP {status}")
+    results = json.loads(body).get("results", [])
     return [
         {
             "title": r.get("title", ""),
@@ -73,6 +74,30 @@ async def web_search(
     ]
 
 
+async def _search(url: str, params: dict[str, Any]) -> tuple[int, bytes]:
+    async with httpx.AsyncClient(
+        timeout=DEFAULT_TIMEOUT, headers={"User-Agent": USER_AGENT}, transport=_transport
+    ) as client:
+        async with client.stream("GET", url, params=params) as response:
+            return response.status_code, await _read_capped(response, MAX_SEARCH_BYTES)
+
+
+async def _read_capped(response: httpx.Response, limit: int) -> bytes:
+    body = bytearray()
+    async for chunk in response.aiter_bytes():
+        body.extend(chunk)
+        if len(body) > limit:
+            raise WebToolError(f"response is larger than {limit // 1_000_000} MB")
+    return bytes(body)
+
+
+async def _deadline(awaitable: Any) -> Any:
+    try:
+        return await asyncio.wait_for(awaitable, OVERALL_TIMEOUT)
+    except asyncio.TimeoutError as e:
+        raise WebToolError(f"timed out after {OVERALL_TIMEOUT:.0f}s") from e
+
+
 # -------------------------------------------------------------------------------------------------- fetch
 
 
@@ -80,19 +105,19 @@ def _private_allowed() -> bool:
     return os.environ.get("WEB_FETCH_ALLOW_PRIVATE", "").strip().lower() in ("1", "true", "yes")
 
 
+_NAT64 = ipaddress.ip_network("64:ff9b::/96")
+
+
 def _non_public(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
-        address = address.ipv4_mapped
-    tailnet = address.version == 4 and address in ipaddress.ip_network("100.64.0.0/10")
-    return (
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        or address.is_reserved
-        or address.is_multicast
-        or address.is_unspecified
-        or tailnet
-    )
+    """True unless the address is globally routable (covers private, loopback, link-local, CGNAT/tailnet,
+    reserved, multicast and documentation ranges, and IPv4 embedded in IPv6 via mapping, 6to4, Teredo or NAT64)."""
+    if isinstance(address, ipaddress.IPv6Address):
+        embedded = [address.ipv4_mapped, address.sixtofour, *(address.teredo or ())]
+        if address in _NAT64:
+            embedded.append(ipaddress.IPv4Address(int(address) & 0xFFFFFFFF))
+        if any(v4 is not None and _non_public(v4) for v4 in embedded):
+            return True
+    return not address.is_global or address.is_multicast
 
 
 async def _check_public(host: str) -> None:
@@ -147,6 +172,10 @@ async def fetch_url(
     url: Annotated[str, Field(description="The http(s) URL to read")],
     max_chars: Annotated[int, Field(description="Maximum characters of content to return", ge=500, le=50_000)] = 8000,
 ) -> dict[str, Any]:
+    return await _deadline(_fetch(url, max_chars))
+
+
+async def _fetch(url: str, max_chars: int) -> dict[str, Any]:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.hostname:
         raise WebToolError("only http(s) URLs can be fetched")
@@ -171,12 +200,9 @@ async def fetch_url(
                         raise WebToolError("redirect to an invalid URL")
                     await _check_public(host)
                     continue
-                response.raise_for_status()
-                body = bytearray()
-                async for chunk in response.aiter_bytes():
-                    body.extend(chunk)
-                    if len(body) > MAX_FETCH_BYTES:
-                        raise WebToolError(f"page is larger than {MAX_FETCH_BYTES // 1_000_000} MB")
+                if response.status_code >= 400:
+                    raise WebToolError(f"HTTP {response.status_code} from {urlparse(url).hostname}")
+                body = await _read_capped(response, MAX_FETCH_BYTES)
                 content_type = response.headers.get("content-type", "")
                 encoding = response.encoding or "utf-8"
                 break

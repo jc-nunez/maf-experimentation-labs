@@ -82,3 +82,35 @@ async def test_fetch_rechecks_redirect_targets(transport, monkeypatch):
 async def test_live_searxng():
     results = await tools.web_search.invoke(arguments={"query": "Microsoft Agent Framework"}, skip_parsing=True)
     assert results and all(r["url"].startswith("http") for r in results)
+
+
+@pytest.mark.parametrize(
+    ("address", "blocked"),
+    [
+        ("8.8.8.8", False),
+        ("2001:4860:4860::8888", False),
+        ("64:ff9b::808:808", False),  # NAT64 of a public address
+        ("10.1.2.3", True),
+        ("100.100.1.1", True),  # tailnet / CGNAT
+        ("fd7a:115c:a1e0::1", True),  # tailnet IPv6
+        ("169.254.169.254", True),  # cloud metadata
+        ("192.0.2.1", True),  # documentation range
+        ("::ffff:10.0.0.1", True),  # IPv4-mapped
+        ("2002:0a00:0001::", True),  # 6to4 of 10.0.0.1
+        ("64:ff9b::a00:1", True),  # NAT64 of 10.0.0.1
+    ],
+)
+def test_address_classification(address, blocked):
+    import ipaddress
+
+    assert tools._non_public(ipaddress.ip_address(address)) is blocked
+
+
+async def test_fetch_caps_response_size(monkeypatch):
+    def handler(request):
+        return httpx.Response(200, headers={"content-type": "text/plain"}, content=b"x" * (tools.MAX_FETCH_BYTES + 1))
+
+    monkeypatch.setattr(tools, "_transport", httpx.MockTransport(handler))
+    monkeypatch.setattr(tools, "_check_public", _public)
+    with pytest.raises(Exception, match="larger than"):
+        await tools.fetch_url.invoke(arguments={"url": "https://e.com/big"}, skip_parsing=True)
