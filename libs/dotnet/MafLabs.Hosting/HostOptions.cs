@@ -12,7 +12,7 @@ public sealed record HostOptions
     public bool Stdio { get; init; }
     public bool List { get; init; }
     public bool Quiet { get; init; }
-    public bool Yes { get; init; }
+    public bool AllowAllTools { get; init; }
 
     public static HostOptions Parse(string[] args)
     {
@@ -31,7 +31,7 @@ public sealed record HostOptions
                 "--stdio" => o with { Stdio = true },
                 "--list" => o with { List = true },
                 "--quiet" => o with { Quiet = true },
-                "-y" or "--yes" => o with { Yes = true },
+                "-y" or "--allow-all-tools" => o with { AllowAllTools = true },
                 "--no-trace" => o, // traces are recorded by mafx for .NET hosts
                 _ when a.StartsWith('-') => throw new ArgumentException($"unknown option {a}"),
                 _ => o with { Target = a },

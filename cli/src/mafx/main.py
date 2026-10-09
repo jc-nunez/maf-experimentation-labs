@@ -86,7 +86,9 @@ def run(
     quiet: bool = typer.Option(False, "--quiet", "-q", help="-p text mode: only print the answer"),
     no_trace: bool = typer.Option(False, "--no-trace", help="do not record .mafx/runs/<id>/trace.jsonl"),
     no_build: bool = typer.Option(False, "--no-build", help="dotnet: skip the build step"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="approve every tool call that needs approval"),
+    allow_all_tools: bool = typer.Option(
+        False, "--allow-all-tools", "-y", help="approve every tool call that needs approval"
+    ),
     allow_tool: Annotated[
         list[str] | None,
         typer.Option("--allow-tool", help="approve this tool without asking (repeatable); others: ask / deny with -p"),
@@ -123,10 +125,15 @@ def run(
                 if not sys.stdin.isatty():
                     _fail("interactive mode needs a terminal; use -p for scripts")
                 await Session(
-                    runner, out, view, ws.root / ".mafx" / "history", approve_all=yes, allow_tools=allow_tool
+                    runner,
+                    out,
+                    view,
+                    ws.root / ".mafx" / "history",
+                    approve_all=allow_all_tools,
+                    allow_tools=allow_tool,
                 ).run()
                 return 0
-            return await _run_once(runner, prompt, output, view, plain, quiet, policy(yes, allow_tool))
+            return await _run_once(runner, prompt, output, view, plain, quiet, policy(allow_all_tools, allow_tool))
         finally:
             await runner.close()
 

@@ -47,7 +47,7 @@ The harness's own tools show up in the trajectory, so you can follow its plannin
 The analysts work on a copy of `data/` under `.mafx/work/harness-lab/<agent>/`, so their writes never touch the repo.
 When an analyst wants to write a file, the turn pauses:
 - **In a session:** `mafx` asks: `y` approve, `a` always for this tool, `A` always with these args, `n` deny.
-- **With `-p`:** pass `--allow-tool file_access_write` or `--yes`. Otherwise the write is denied and the agent is told.
+- **With `-p`:** pass `--allow-tool file_access_write` or `--allow-all-tools`. Otherwise the write is denied and the agent is told.
 
 ```bash
 mafx run harness-lab/analyst

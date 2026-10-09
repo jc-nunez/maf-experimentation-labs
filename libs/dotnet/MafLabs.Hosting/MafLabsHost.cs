@@ -107,8 +107,8 @@ public sealed class MafLabsHost
                 else if (Options.Output == "text" && !Options.Quiet) Plain(e);
             }
             if (runner.Pending.Count == 0) break;
-            // Standalone -p: approve everything with --yes, otherwise deny (mafx relays decisions itself).
-            var decision = Options.Yes ? "approve" : "deny";
+            // Standalone -p: approve everything with --allow-all-tools, otherwise deny (mafx relays decisions itself).
+            var decision = Options.AllowAllTools ? "approve" : "deny";
             stream = runner.ApproveAsync(runner.Pending.ToDictionary(r => r.RequestId, _ => decision));
         }
         var done = events.LastOrDefault() ?? new JsonObject();

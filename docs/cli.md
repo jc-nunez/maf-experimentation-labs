@@ -26,7 +26,7 @@ looking upward for `maf-labs.yaml`; set `MAFX_HOME` to use it from anywhere.
 - `-q`: print only the answer.
 - `--no-trace`: don't record the run.
 - `--no-build`: skip the build step for .NET components.
-- `--yes` (`-y`): approve every tool call that needs approval.
+- `--allow-all-tools` (`-y`): approve every tool call that needs approval.
 - `--allow-tool NAME`: approve that tool without asking (repeatable). Other requests are asked about in a session and denied with `-p`.
 
 Targets can be written as `project/name`, as `project` (uses the first agent), or as `name` (inside a project

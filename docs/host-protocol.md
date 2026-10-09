@@ -42,7 +42,7 @@ Some tools pause the turn until a person decides. Examples: the harness file-acc
 
 How each client decides:
 - **`mafx` interactive:** asks for each request (`y`, `a`, `A`, `n`).
-- **`mafx -p`:** denies unless `--yes` or `--allow-tool NAME` is given.
-- **A standalone host with `-p`:** approves with `--yes`, denies otherwise.
+- **`mafx -p`:** denies unless `--allow-all-tools` or `--allow-tool NAME` is given.
+- **A standalone host with `-p`:** approves with `--allow-all-tools`, denies otherwise.
 
 Trace files add `run_started` (target, runtime, provider, model, mode, run_id), `user_message` and `session_reset`.

@@ -14,6 +14,15 @@ PROJECT = load_project(ROOT)
 WRITE = 'call:file_access_write {{"file_name": "{name}", "content": "x"}}'
 
 
+@pytest.fixture(autouse=True)
+def _cleanup():
+    """Remove the files these tests write, so the analysts' working folders only hold real data."""
+    yield
+    work = find_workspace(ROOT).root / ".mafx" / "work" / "harness-lab"
+    for leftover in work.glob("analyst*/test-*.md"):
+        leftover.unlink()
+
+
 def _name(stem: str) -> str:
     """Unique per run: the analyst's working folder persists between runs."""
     return f"test-{stem}-{uuid.uuid4().hex[:8]}.md"

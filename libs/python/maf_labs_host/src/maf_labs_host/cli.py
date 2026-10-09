@@ -37,7 +37,9 @@ def build_parser(prog: str | None = None) -> argparse.ArgumentParser:
     p.add_argument("--stdio", action="store_true", help="speak the JSONL host protocol on stdin/stdout")
     p.add_argument("--list", action="store_true", help="list components and exit")
     p.add_argument("--quiet", action="store_true", help="text mode: do not print the trajectory to stderr")
-    p.add_argument("-y", "--yes", action="store_true", help="-p: approve every tool call that needs approval")
+    p.add_argument(
+        "-y", "--allow-all-tools", action="store_true", help="-p: approve every tool call that needs approval"
+    )
     p.add_argument(
         "--allow-tool", action="append", default=[], metavar="NAME", help="-p: approve this tool (repeatable)"
     )
@@ -206,7 +208,9 @@ async def _amain(project: Project, args: argparse.Namespace) -> int:
             return await serve_stdio(runner)
         if args.prompt is not None:
             prompt = sys.stdin.read() if args.prompt == "-" else args.prompt
-            return await _run_once(runner, prompt, args.output, args.quiet, policy(args.yes, args.allow_tool))
+            return await _run_once(
+                runner, prompt, args.output, args.quiet, policy(args.allow_all_tools, args.allow_tool)
+            )
         return await _interactive(runner)
     finally:
         await runner.close()
