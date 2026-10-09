@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import re
 import time
 from collections.abc import AsyncIterator, Iterable
 from typing import Any
@@ -30,6 +31,26 @@ APPROVAL_CHOICES = ("approve", "deny", "always", "always_args")
 WARNING = "warning"
 ERROR = "error"
 TURN_COMPLETED = "turn_completed"
+
+
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def visible(text: str) -> str:
+    """Escape control characters (ANSI/OSC sequences, carriage returns, ...) so a terminal shows them instead of
+    executing them. Model output and tool results (e.g. fetched web pages) are untrusted. Keeps newline and tab."""
+    return _CONTROL.sub(lambda m: f"\\x{ord(m.group()):02x}", text)
+
+
+def visible_event(value: Any) -> Any:
+    """``visible`` applied to every string inside an event (keys included)."""
+    if isinstance(value, str):
+        return visible(value)
+    if isinstance(value, dict):
+        return {visible_event(k): visible_event(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [visible_event(v) for v in value]
+    return value
 
 
 def event(type_: str, **data: Any) -> dict[str, Any]:

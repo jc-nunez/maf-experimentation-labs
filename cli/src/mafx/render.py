@@ -18,6 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from maf_labs_host.events import visible_event
 from rich.console import Console, ConsoleOptions, RenderableType, RenderResult
 from rich.live import Live
 from rich.markdown import Markdown
@@ -45,14 +46,6 @@ def _json(value: Any) -> str:
     if len(compact) <= 100:
         return compact
     return json.dumps(value, indent=2, ensure_ascii=False, default=str)
-
-
-_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
-
-
-def _visible(text: str) -> str:
-    """Show control characters (e.g. ANSI escapes in tool arguments) instead of letting the terminal run them."""
-    return _CONTROL.sub(lambda m: f"\\x{ord(m.group()):02x}", text)
 
 
 def _plural(n: int, word: str) -> str:
@@ -196,7 +189,7 @@ class Renderer:
             self._print()
 
     def _body(self, label: str, value: Any, style: str = "", fold: bool = True) -> None:
-        text = _visible(_json(value))
+        text = _json(value)
         lines = text.splitlines() or [""]
         if fold and self.view == "normal" and len(lines) > FOLD_LINES:
             lines = [*lines[:FOLD_LINES], f"… +{len(lines) - FOLD_LINES} lines (/view full)"]
@@ -274,6 +267,8 @@ class Renderer:
     # ------------------------------------------------------------------------------------------ events
 
     def handle(self, e: dict[str, Any]) -> None:
+        # Everything shown comes from the model, tools or web pages: never let it drive the terminal.
+        e = visible_event(e)
         t = e["type"]
         executor = e.get("executor_id")
 
@@ -400,6 +395,7 @@ class Renderer:
 
 def print_info(console: Console, info: dict[str, Any]) -> None:
     """Session header: what is running, on which model, with which tools."""
+    info = visible_event(info)
     head = (
         Text("╭─ ", style="dim")
         + Text(info.get("target", "?"), style="bold")
@@ -423,6 +419,7 @@ def print_info(console: Console, info: dict[str, Any]) -> None:
 
 
 def print_instructions(console: Console, info: dict[str, Any]) -> None:
+    info = visible_event(info)
     if info.get("instructions"):
         console.print(Text("system prompt", style="bold"))
         console.print(Syntax(info["instructions"], "markdown", word_wrap=True, background_color="default"))

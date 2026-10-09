@@ -159,7 +159,9 @@ async def _run_once(runner, prompt: str, output: str, view: str, plain: bool, qu
         renderer.finish()
     done = collected[-1] if collected else {}
     if output == "text":
-        print(done.get("text", "").strip())
+        answer = done.get("text", "").strip()
+        # Raw when piped (it is data); escaped when a person's terminal would interpret it.
+        print(ev.visible(answer) if sys.stdout.isatty() else answer)
     elif output == "json":
         print(json.dumps({"info": runner.info, "result": done, "events": collected}, indent=2, default=str))
     return 0 if done.get("ok") else 1

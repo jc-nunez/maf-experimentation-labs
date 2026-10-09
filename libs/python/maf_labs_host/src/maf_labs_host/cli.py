@@ -47,6 +47,7 @@ def build_parser(prog: str | None = None) -> argparse.ArgumentParser:
 
 def _plain(event: dict[str, Any], out: Any) -> None:
     """Minimal plain-text trajectory renderer (stderr). mafx provides the rich version."""
+    event = ev.visible_event(event)
     t = event["type"]
     if t == ev.REASONING:
         out.write(event["text"])
@@ -83,7 +84,8 @@ async def _run_once(runner: Runner, prompt: str, output: str, quiet: bool, decid
             _plain(e, sys.stderr)
     done = collected[-1] if collected else {}
     if output == "text":
-        print(done.get("text", "").strip())
+        answer = done.get("text", "").strip()
+        print(ev.visible(answer) if sys.stdout.isatty() else answer)
     elif output == "json":
         print(json.dumps({"info": runner.info, "result": done, "events": collected}, default=str, indent=2))
     return 0 if done.get("ok", False) else 1
@@ -105,7 +107,7 @@ async def _interactive(runner: Runner) -> int:
             continue
         async for e in runner.turn(text):
             if e["type"] == ev.TEXT:
-                sys.stdout.write(e["text"])
+                sys.stdout.write(ev.visible(e["text"]))
                 sys.stdout.flush()
             else:
                 _plain(e, sys.stderr)

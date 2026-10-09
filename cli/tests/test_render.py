@@ -2,6 +2,7 @@
 
 import io
 
+import pytest
 from mafx.render import Renderer, _markdown_boundary, _Trimmed
 from rich.console import Console
 from rich.markdown import Markdown
@@ -72,3 +73,17 @@ def test_approval_requests_show_full_arguments_even_when_folding():
 def test_control_characters_in_arguments_are_shown_not_executed():
     text = render([{"type": "approval_request", "request_id": "r1", "name": "write", "arguments": "safe\x1b[2Kspoof"}])
     assert "\x1b" not in text and "\\x1b" in text
+
+
+@pytest.mark.parametrize(
+    "event",
+    [
+        {"type": "text_delta", "text": "answer\x1b]0;pwned\x07 done"},
+        {"type": "reasoning_delta", "text": "think\x1b[2J"},
+        {"type": "tool_result", "call_id": "c", "result": "page\x1b[31mred"},
+        {"type": "tool_call", "call_id": "c", "name": "tool\x1b[1A", "arguments": {}},
+        {"type": "error", "message": "boom\x1b[2K"},
+    ],
+)
+def test_untrusted_text_cannot_inject_terminal_escapes(event):
+    assert "\x1b" not in render([event])
