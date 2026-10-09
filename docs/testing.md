@@ -26,6 +26,15 @@ mafx run hello-world/draft-review  -p "A two-line poem about testing"        # p
 mafx run hello-world/greeting-flow -p "hi"                                   # declarative workflow
 ```
 
+## Harness agents (planning, todos, modes, file memory)
+```bash
+mafx run harness-lab/claw                 # interactive; try a multi-step request and watch todos_add / mode_set
+mafx run harness-lab/claw -p "My watchlist is MSFT, NVDA and AAPL. Save it, then tell me which is cheapest." --view quiet
+mafx run harness-lab/claw -p "Make a todo per ticker (MSFT, NVDA) to get its price and note it in watchlist.md, then execute without asking."
+mafx run harness-lab/claw-dotnet -p "My watchlist is MSFT and NVDA. Which is cheaper?"
+ls .mafx/memory/harness-lab/              # one folder of memory files per session
+```
+
 ## Tools (no model involved)
 ```bash
 mafx tool inspect hello-world/get_weather                       # JSON schema the model sees

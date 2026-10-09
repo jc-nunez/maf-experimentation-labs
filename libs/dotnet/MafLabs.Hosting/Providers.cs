@@ -15,7 +15,7 @@ public static class Providers
 
     public static (IChatClient Client, ProviderInfo Info) Create(string? provider, string? model)
     {
-        var name = (provider ?? Env.Get("MAF_PROVIDER") ?? Env.DefaultProvider() ?? "sglang").ToLowerInvariant();
+        var name = Resolve(provider);
         switch (name)
         {
             case "mock":
@@ -70,6 +70,9 @@ public static class Providers
                 throw new ArgumentException($"unknown provider '{name}'; choose one of {string.Join(", ", Names)}");
         }
     }
+
+    public static string Resolve(string? provider) =>
+        (provider ?? Env.Get("MAF_PROVIDER") ?? Env.DefaultProvider() ?? "sglang").ToLowerInvariant();
 
     private static OpenAIClient CreateOpenAIClient(string baseUrl, string apiKey, bool sglangCompat = false)
     {

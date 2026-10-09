@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -104,7 +105,7 @@ PY_PYPROJECT = """
 [project]
 name = "{name}"
 version = "0.1.0"
-description = "{description}"
+description = {description_quoted}
 requires-python = ">=3.10"
 dependencies = ["maf-labs-host"]
 
@@ -193,11 +194,15 @@ def new_project(projects_dir: Path, name: str, description: str, runtimes: list[
         raise ScaffoldError(f"{root} already exists")
     package = snake(name)
     created: list[Path] = []
-    _write(root / "project.yaml", PROJECT_YAML.format(name=name, description=description, package=package), created)
+    # JSON strings are valid YAML and TOML strings, so descriptions with ':' or quotes stay valid.
+    quoted = json.dumps(description)
+    _write(root / "project.yaml", PROJECT_YAML.format(name=name, description=quoted, package=package), created)
     _write(root / "README.md", PROJECT_README.format(name=name, description=description), created)
     if "python" in runtimes:
         py = root / "python"
-        _write(py / "pyproject.toml", PY_PYPROJECT.format(name=name, description=description, package=package), created)
+        _write(
+            py / "pyproject.toml", PY_PYPROJECT.format(name=name, description_quoted=quoted, package=package), created
+        )
         pkg = py / "src" / package
         _write(pkg / "__init__.py", f'"""{name}: {description}"""\n', created)
         _write(pkg / "__main__.py", PY_MAIN.format(package=package), created)
@@ -264,7 +269,7 @@ from agent_framework import tool
 from pydantic import Field
 
 
-@tool(name="{name}", description="Describe what {name} does — the model reads this.")
+@tool(name="{func}", description="Describe what {name} does — the model reads this.")
 def {func}(value: Annotated[str, Field(description="Describe the argument")]) -> dict:
     return {{"echo": value}}
 '''

@@ -1,0 +1,28 @@
+# Project manifest — the source of truth for mafx and the shared hosts. See docs/manifest.md.
+name: harness-lab
+description: "Harness agents (create_harness_agent / HarnessAgent): planning, todos, modes, file memory"
+status: incubating
+tags: [harness, sample]
+python_package: harness_lab
+
+components:
+  agents:
+    - name: claw
+      description: Personal finance assistant on create_harness_agent (todos, plan/execute modes, file memory, loop)
+      runtime: python
+      entry: harness_lab.agents.claw:create_agent
+      tools: [get-stock-price]
+
+    - name: claw-dotnet
+      description: Same assistant on the .NET HarnessAgent (AsHarnessAgent)
+      runtime: dotnet
+      project: dotnet/HarnessLab/HarnessLab.csproj
+
+  tools:
+    - name: get-stock-price
+      description: Illustrative stock prices (mock data)
+      kind: function
+      runtime: python
+      entry: harness_lab.tools.get_stock_price:get_stock_price
+
+  workflows: []

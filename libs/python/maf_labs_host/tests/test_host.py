@@ -76,11 +76,18 @@ def test_stdio_protocol_round_trip():
     assert lines[-1]["type"] == "turn_completed" and lines[-1]["text"] == "[mock] hi"
 
 
-async def test_sglang_strips_reasoning_from_replayed_history():
+async def test_sglang_client_never_replays_reasoning(monkeypatch):
     """SGLang returns reasoning without encrypted_content, so it must not be replayed (it would be rejected)."""
-    from agent_framework import ChatContext, Message
-    from maf_labs_host.providers import StripReplayedReasoning
+    from agent_framework import Message
+    from agent_framework.openai import OpenAIChatClient
+    from maf_labs_host.providers import SGLangResponsesClient
 
+    sent = {}
+
+    def fake_inner(self, *, messages, options, stream=False, **kwargs):
+        sent["messages"] = messages
+
+    monkeypatch.setattr(OpenAIChatClient, "_inner_get_response", fake_inner)
     history = [
         Message("user", ["weather?"]),
         Message(
@@ -92,13 +99,8 @@ async def test_sglang_strips_reasoning_from_replayed_history():
         ),
         Message("tool", [Content.from_function_result(call_id="c1", result="sunny")]),
     ]
-    context = ChatContext(client=None, messages=history, options=None)
-
-    async def call_next():
-        return None
-
-    await StripReplayedReasoning().process(context, call_next)
-    sent = context.messages
-    assert [c.type for c in sent[1].contents] == ["function_call"]
-    assert sent[0] is history[0] and sent[2] is history[2]
+    client = SGLangResponsesClient(model="m", api_key="k", base_url="http://localhost/v1")
+    client._inner_get_response(messages=history, options={})
+    assert [c.type for c in sent["messages"][1].contents] == ["function_call"]
+    assert sent["messages"][0] is history[0] and sent["messages"][2] is history[2]
     assert any(c.type == "text_reasoning" for c in history[1].contents)  # session history untouched

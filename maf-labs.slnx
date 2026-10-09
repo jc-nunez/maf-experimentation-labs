@@ -5,4 +5,7 @@
   <Folder Name="/projects/hello-world/">
     <Project Path="projects/hello-world/dotnet/HelloWorld/HelloWorld.csproj" />
   </Folder>
+  <Folder Name="/projects/harness-lab/">
+    <Project Path="projects/harness-lab/dotnet/HarnessLab/HarnessLab.csproj" />
+  </Folder>
 </Solution>

@@ -29,7 +29,10 @@ public sealed partial class MockChatClient(string model) : IChatClient
             ];
         }
 
-        var user = list.LastOrDefault(m => m.Role == ChatRole.User)?.Text ?? "";
+        // The user's input is the first message of the trailing block of user messages: context providers
+        // (e.g. the harness todo list) may append their own user-role messages after it.
+        var lastNonUser = list.FindLastIndex(m => m.Role != ChatRole.User && m.Role != ChatRole.System);
+        var user = list.Skip(lastNonUser + 1).FirstOrDefault(m => m.Role == ChatRole.User)?.Text ?? "";
         var calls = CallRegex().Matches(user);
         if (calls.Count > 0)
         {

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>HarnessLab</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../../../libs/dotnet/MafLabs.Hosting/MafLabs.Hosting.csproj" />
+    <PackageReference Include="Microsoft.Agents.AI.Harness" />
+  </ItemGroup>
+
+</Project>

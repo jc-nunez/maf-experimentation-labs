@@ -24,6 +24,12 @@ public sealed class MafLabsHost
 
     public HostOptions Options { get; }
 
+    /// <summary>Workspace root (the folder with maf-labs.yaml), or null when run outside the workspace.</summary>
+    public string? WorkspaceRoot => Env.WorkspaceRoot;
+
+    /// <summary>The provider this run will use (--provider, MAF_PROVIDER, maf-labs.yaml defaults, then sglang).</summary>
+    public string Provider => Providers.Resolve(Options.Provider);
+
     public static MafLabsHost Create(string[] args)
     {
         Env.Load();
