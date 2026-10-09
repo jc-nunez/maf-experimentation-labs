@@ -18,7 +18,8 @@
 - Declarative YAML: no `model:` block (the host injects the client). `=` PowerFx expressions need the .NET runtime +
   `powerfx`; prefer `{Variable}` interpolation.
 - .NET: project-based apps in `dotnet/<Proj>/`, single-file apps in `dotnet/apps/` (never in a folder with a
-  `.csproj`). Package versions only in `Directory.Packages.props`.
+  `.csproj`) with `#:property PublishAot=false` (AOT disables the reflection JSON that tool calling needs).
+  Package versions only in `Directory.Packages.props`.
 - stdout is reserved for answers (`-p`) and the JSONL protocol (`--stdio`); log to stderr.
 
 ## Checks before committing
@@ -26,4 +27,5 @@
 uv run ruff check . && uv run ruff format --check .
 uv run pytest                 # offline, mock provider
 uv run mafx validate
+dotnet build maf-labs.slnx    # when .NET code changed
 ```

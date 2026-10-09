@@ -1,4 +1,5 @@
 #:project ../../../../libs/dotnet/MafLabs.Hosting/MafLabs.Hosting.csproj
+#:property PublishAot=false
 // .NET 10 single-file app:  dotnet run greeter.cs -- -p "What's the weather in Paris?"
 using System.ComponentModel;
 using MafLabs.Hosting;

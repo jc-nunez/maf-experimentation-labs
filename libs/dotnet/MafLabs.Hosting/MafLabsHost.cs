@@ -17,7 +17,8 @@ namespace MafLabs.Hosting;
 /// </example>
 public sealed class MafLabsHost
 {
-    private readonly Dictionary<string, (string? Description, Func<IChatClient, AIAgent> Factory)> _agents = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (string? Description, Func<IChatClient, AIAgent> Factory, string[] Tools)> _agents =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private MafLabsHost(HostOptions options) => Options = options;
 
@@ -30,14 +31,18 @@ public sealed class MafLabsHost
     }
 
     /// <summary>Register an agent built from instructions and tools on the host's chat client.</summary>
-    public MafLabsHost AddAgent(string name, string instructions, IList<AITool>? tools = null, string? description = null) =>
-        AddAgent(name, client => client.AsAIAgent(instructions: instructions, name: name, description: description, tools: tools),
-            description);
+    public MafLabsHost AddAgent(string name, string instructions, IList<AITool>? tools = null, string? description = null)
+    {
+        _agents[name] = (description,
+            client => client.AsAIAgent(instructions: instructions, name: name, description: description, tools: tools),
+            (tools ?? []).Select(t => t.Name).ToArray());
+        return this;
+    }
 
     /// <summary>Register an agent with full control over how it is built.</summary>
-    public MafLabsHost AddAgent(string name, Func<IChatClient, AIAgent> factory, string? description = null)
+    public MafLabsHost AddAgent(string name, Func<IChatClient, AIAgent> factory, string? description = null, string[]? toolNames = null)
     {
-        _agents[name] = (description, factory);
+        _agents[name] = (description, factory, toolNames ?? []);
         return this;
     }
 
@@ -47,15 +52,15 @@ public sealed class MafLabsHost
         {
             if (Options.List)
             {
-                foreach (var (name, (desc, _)) in _agents) Console.WriteLine($"agent     {name,-24} dotnet       {desc}");
+                foreach (var (agentName, entry) in _agents) Console.WriteLine($"agent     {agentName,-24} dotnet       {entry.Description}");
                 return 0;
             }
             if (_agents.Count == 0) throw new InvalidOperationException("no agents registered (call host.AddAgent before RunAsync)");
 
             var (client, info) = Providers.Create(Options.Provider, Options.Model);
             var name = ResolveTarget();
-            var agent = _agents[name].Factory(client);
-            var runner = new AgentRunner(agent, name, info);
+            var registration = _agents[name];
+            var runner = new AgentRunner(registration.Factory(client), name, info, registration.Tools);
             await runner.ResetAsync();
 
             if (Options.Stdio) return await ServeStdioAsync(runner);
@@ -168,7 +173,7 @@ public sealed class MafLabsHost
     }
 }
 
-internal sealed class AgentRunner(AIAgent agent, string name, ProviderInfo provider)
+internal sealed class AgentRunner(AIAgent agent, string name, ProviderInfo provider, string[] toolNames)
 {
     private AgentSession? _session;
 
@@ -184,8 +189,7 @@ internal sealed class AgentRunner(AIAgent agent, string name, ProviderInfo provi
         ["model"] = provider.Model,
         ["api"] = provider.Api,
         ["agent_name"] = agent.Name,
-        ["tools"] = new JsonArray((agent.GetService<ChatClientAgent>()?.ChatOptions?.Tools ?? [])
-            .Select(t => (JsonNode)JsonValue.Create(t.Name)!).ToArray()),
+        ["tools"] = new JsonArray(toolNames.Select(t => (JsonNode)JsonValue.Create(t)!).ToArray()),
         ["instructions"] = agent.GetService<ChatClientAgent>()?.Instructions,
     };
 

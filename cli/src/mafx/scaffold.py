@@ -243,6 +243,7 @@ instructions: |
 
 DOTNET_AGENT = """
 #:project {hosting}
+#:property PublishAot=false
 // .NET 10 single-file app: dotnet run {name}.cs -- -p "hello"
 using MafLabs.Hosting;
 using Microsoft.Extensions.AI;

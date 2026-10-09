@@ -23,5 +23,5 @@ Two ways to write a .NET component, both supported by the manifest:
 interactive UI, trajectory view and traces as Python ones. A host with a single registered agent serves it
 whatever name the manifest uses.
 
-> **Not yet compiled.** The .NET code was written against the published 1.24.0 API. The authoring environment
-> had no .NET SDK, so it has not been built. Build it once locally: `dotnet build maf-labs.slnx`.
+Build everything with `dotnet build maf-labs.slnx`. On Ubuntu 24.04 the SDK is available from Microsoft's apt
+repository (`dotnet-sdk-10.0`).

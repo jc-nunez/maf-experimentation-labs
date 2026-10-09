@@ -93,7 +93,7 @@ class DotnetRunner(Runner):
             tail = "\n".join(self.stderr_lines[-20:])
             raise RuntimeError(f".NET host did not start ({' '.join(self.cmd)}):\n{tail}")
         self.info.update(ready.get("info") or {})
-        self.info["runtime"] = "dotnet"
+        self.info.update(target=self.target, runtime="dotnet")
 
     async def reset(self) -> None:
         await self._send({"type": "reset"})
