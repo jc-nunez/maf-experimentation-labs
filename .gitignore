@@ -25,3 +25,6 @@ checkpoints/
 .vscode/*
 !.vscode/extensions.json
 .DS_Store
+
+# Cowork -> Claude Code handoff queue (shared by all worktrees)
+.handoffs/
