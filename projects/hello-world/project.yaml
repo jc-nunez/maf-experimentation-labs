@@ -1,0 +1,57 @@
+# Project manifest — the source of truth for mafx and the shared hosts. See docs/manifest.md.
+name: hello-world
+description: Minimal example of agents, tools and workflows across python, declarative and .NET
+status: incubating
+tags: [sample]
+python_package: hello_world
+
+components:
+  agents:
+    - name: greeter
+      description: Friendly assistant that can look up the weather (python)
+      runtime: python
+      entry: hello_world.agents.greeter:create_agent
+      tools: [get_weather]
+      reasoning_effort: low       # simple lookups: little thinking needed (override per run with --effort)
+
+    - name: greeter-yaml
+      description: Same assistant, defined declaratively
+      runtime: declarative
+      file: declarative/agents/greeter.yaml
+      tools: [get_weather]
+      reasoning_effort: low
+
+    - name: greeter-dotnet
+      description: Same assistant on .NET (project-based)
+      runtime: dotnet
+      project: dotnet/HelloWorld/HelloWorld.csproj
+      reasoning_effort: low       # passed to the .NET host as --effort
+
+    - name: greeter-dotnet-file
+      description: Same assistant on .NET (single-file app, dotnet run apps/greeter.cs)
+      runtime: dotnet
+      file: dotnet/apps/greeter.cs
+
+  tools:
+    - name: get_weather
+      description: Fake weather lookup (deterministic, for testing)
+      kind: function
+      runtime: python
+      entry: hello_world.tools.weather:get_weather
+
+    # Example MCP tool (uncomment once you have a server):
+    # - name: docs-mcp
+    #   kind: mcp
+    #   transport: http
+    #   url: https://learn.microsoft.com/api/mcp
+
+  workflows:
+    - name: draft-review
+      description: Writer drafts, reviewer critiques (python WorkflowBuilder)
+      runtime: python
+      entry: hello_world.workflows.draft_review:create_workflow
+
+    - name: greeting-flow
+      description: Tiny declarative workflow (SetVariable + SendActivity)
+      runtime: declarative
+      file: declarative/workflows/greeting.yaml

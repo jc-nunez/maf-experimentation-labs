@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Experimental APIs used on purpose: OpenAI Responses client, MEAI/MAF previews. -->
+    <NoWarn>$(NoWarn);OPENAI001;MEAI001;MAAI001</NoWarn>
+  </PropertyGroup>
+</Project>

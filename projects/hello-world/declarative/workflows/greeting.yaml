@@ -1,0 +1,14 @@
+# Declarative workflow (agent-framework-declarative, kind: Workflow). Experimental upstream.
+kind: Workflow
+trigger:
+  kind: OnConversationStart
+  id: greeting_workflow
+  actions:
+    - kind: SetVariable
+      id: set_greeting
+      variable: Local.Greeting
+      value: "Hello from a declarative workflow!"
+    - kind: SendActivity
+      id: send_greeting
+      # Plain string interpolation; "=..." PowerFx expressions need the .NET runtime + powerfx package.
+      activity: "{Local.Greeting} You said: {System.LastMessage.Text}"

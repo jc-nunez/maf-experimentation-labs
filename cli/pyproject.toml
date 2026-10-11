@@ -1,0 +1,25 @@
+[project]
+name = "mafx"
+version = "0.1.0"
+description = "CLI to create, run, inspect and evaluate Microsoft Agent Framework projects in this workspace"
+requires-python = ">=3.10"
+dependencies = [
+    "maf-labs-host",
+    "typer>=0.12",
+    "rich>=13",
+    "prompt-toolkit>=3.0.40",
+    "httpx>=0.27",
+]
+
+[project.scripts]
+mafx = "mafx.main:cli"
+
+[tool.uv.sources]
+maf-labs-host = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mafx"]

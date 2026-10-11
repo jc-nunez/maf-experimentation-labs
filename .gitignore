@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Local config and run data
+.env
+infra/*/.env
+.mafx/
+checkpoints/
+
+# Editors / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+
+# Cowork -> Claude Code handoff queue (shared by all worktrees)
+.handoffs/

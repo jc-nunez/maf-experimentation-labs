@@ -1,0 +1,54 @@
+# Project manifest — the source of truth for mafx and the shared hosts. See docs/manifest.md.
+name: harness-lab
+description: "Harness agents (create_harness_agent / HarnessAgent): planning, todos, modes, file memory"
+status: incubating
+tags: [harness, sample]
+python_package: harness_lab
+
+components:
+  agents:
+    - name: claw
+      description: Personal finance assistant on create_harness_agent (todos, plan/execute modes, file memory, loop)
+      runtime: python
+      entry: harness_lab.agents.claw:create_agent
+      tools: [get-stock-price, web]
+      reasoning_effort: medium    # planning + tool use; xhigh is rarely needed here
+
+    - name: researcher
+      description: Research assistant on create_harness_agent with web search via SearXNG (port of harness_research.py)
+      runtime: python
+      entry: harness_lab.agents.researcher:create_agent
+      tools: [web]
+      # no reasoning_effort: research uses the server default (xhigh)
+
+    - name: analyst
+      description: Data analyst with file access over data/ (port of harness_data_processing.py); writes need approval
+      runtime: python
+      entry: harness_lab.agents.analyst:create_agent
+      reasoning_effort: medium
+
+    - name: claw-dotnet
+      description: Same assistant on the .NET HarnessAgent (AsHarnessAgent)
+      runtime: dotnet
+      project: dotnet/HarnessLab/HarnessLab.csproj
+      reasoning_effort: medium
+
+    - name: analyst-dotnet
+      description: Same data analyst on the .NET HarnessAgent (file access; writes need approval)
+      runtime: dotnet
+      project: dotnet/HarnessLab/HarnessLab.csproj
+      reasoning_effort: medium
+
+  tools:
+    - name: get-stock-price
+      description: Illustrative stock prices (mock data)
+      kind: function
+      runtime: python
+      entry: harness_lab.tools.get_stock_price:get_stock_price
+
+    - name: web
+      description: web_search (SearXNG at SEARXNG_URL) and fetch_url (page -> markdown), shared tool pack
+      kind: ref
+      ref: tools/python/web-search
+
+  workflows: []

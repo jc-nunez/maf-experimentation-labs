@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/libs/">
+    <Project Path="libs/dotnet/MafLabs.Hosting/MafLabs.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/projects/hello-world/">
+    <Project Path="projects/hello-world/dotnet/HelloWorld/HelloWorld.csproj" />
+  </Folder>
+  <Folder Name="/projects/harness-lab/">
+    <Project Path="projects/harness-lab/dotnet/HarnessLab/HarnessLab.csproj" />
+  </Folder>
+</Solution>

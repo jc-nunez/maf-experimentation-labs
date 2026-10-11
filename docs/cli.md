@@ -1,0 +1,56 @@
+# mafx
+
+Install once: `uv tool install --editable ./cli`, or prefix commands with `uv run`. `mafx` finds the workspace by
+looking upward for `maf-labs.yaml`; set `MAFX_HOME` to use it from anywhere.
+
+| Command | Purpose |
+|---|---|
+| `mafx run <project>/<name> [-p PROMPT]` | Run an agent or workflow. `-p` runs once and exits (`-p -` reads stdin); without it you get an interactive session |
+| `mafx list` / `mafx show <project>` | List projects and components |
+| `mafx new project <name> -r python,declarative,dotnet` | Create a project |
+| `mafx new agent\|workflow <project> <name> -r <runtime>` | Create a component and add it to the manifest |
+| `mafx new tool <project> <name> [-k mcp] [--shared]` | Create a function tool (with a test), an MCP entry, or a shared tool package |
+| `mafx tool inspect <project>/<tool>` | Show the JSON schema the model sees (for MCP: every server function) |
+| `mafx tool run <project>/<tool> -a '{json}'` | Call a tool directly, no model involved |
+| `mafx validate [project]` | Check manifests, entries, files and tool refs, and build components on the mock |
+| `mafx doctor` | Check the toolchain, `.env`, `GET /models`, a Responses call and a tool call |
+| `mafx models` | Models served by the endpoint |
+| `mafx trace list` / `mafx trace show [run\|last]` | Recorded trajectories; replay one |
+| `mafx infra up\|down\|status [name]` | Local supporting services from `infra/<name>/compose.yaml` (e.g. SearXNG); secrets generated on first run |
+
+`run` options:
+- `--provider`, `--model`: override the provider or model for this run.
+- `--effort none|low|medium|xhigh` (`-e`): reasoning effort for this run. It overrides the agent's `reasoning_effort`.
+- `--view full|normal|quiet`: how much of the trajectory to show.
+- `--output text|json|jsonl`: output format in `-p` mode.
+- `--plain`: no live markdown rendering.
+- `-q`: print only the answer.
+- `--no-trace`: don't record the run.
+- `--no-build`: skip the build step for .NET components.
+- `--allow-all-tools` (`-y`): approve every tool call that needs approval.
+- `--allow-tool NAME`: approve that tool without asking (repeatable). Other requests are asked about in a session and denied with `-p`.
+
+Targets can be written as `project/name`, as `project` (uses the first agent), or as `name` (inside a project
+folder, or when the name is unique across the workspace).
+
+## Interactive session
+- **Keys:** ⏎ sends, Alt+⏎ or Ctrl+J adds a newline, Tab completes slash commands, Ctrl+C interrupts the current response, Ctrl+D exits.
+- **Slash commands:**
+  - `/view full|normal|quiet`: how much to show (reasoning folded, long results folded, …)
+  - `/retry`: re-run the last prompt
+  - `/reset`: start a new session
+  - `/info`: what is running
+  - `/system`: show the instructions
+  - `/effort none|low|medium|xhigh|default`: change the reasoning effort for the following turns
+  - `/trace`: show the trace file path
+  - `/clear`, `/exit`
+- **Tool approvals:** when a tool needs approval, the session shows the call and asks once per request:
+  - `y` or ⏎: approve this call.
+  - `a`: always approve this tool for the session.
+  - `A`: always approve it with these exact arguments.
+  - `n`, Esc or Ctrl+C: deny.
+- **History** is saved per target in `.mafx/history/`.
+
+Set `MAFX_DEBUG=1` to get full tracebacks.
+
+For a hands-on walkthrough of every use case, see [testing.md](testing.md).
