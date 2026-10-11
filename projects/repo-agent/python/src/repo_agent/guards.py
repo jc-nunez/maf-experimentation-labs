@@ -94,7 +94,7 @@ class Allowlist:
 
 
 SLICE1_PATTERNS: tuple[tuple[str, ...], ...] = (
-    ("git", "clone", URL, PATH),
+    ("git", "clone", "--", URL, PATH),
     ("git", "status", "--porcelain=v2", "--branch"),
     ("git", "worktree", "list", "--porcelain"),
     ("git", "log", "-1", "--format=%h %cs %s"),

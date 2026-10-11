@@ -35,8 +35,15 @@ class Runner:
         for path in self.allowlist.match(argv):
             self.guard.check(cwd / path)
         workdir = self.guard.check(cwd)
-        # Never prompt for credentials or open an editor: the caller is a tool, not a terminal.
-        env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_EDITOR": "true", "GH_PROMPT_DISABLED": "1"}
+        # Never prompt for credentials or open an editor: the caller is a tool, not a terminal. Git may only use the
+        # allowlisted URL schemes as transports (no ext::, no ssh), also for anything a clone pulls in.
+        env = {
+            **os.environ,
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_EDITOR": "true",
+            "GH_PROMPT_DISABLED": "1",
+            "GIT_ALLOW_PROTOCOL": ":".join(self.allowlist.url_schemes),
+        }
         try:
             proc = subprocess.run(
                 argv, cwd=workdir, env=env, capture_output=True, text=True, timeout=TIMEOUT_SECONDS, check=False

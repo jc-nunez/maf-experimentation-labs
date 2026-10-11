@@ -66,7 +66,7 @@ def test_allowlist_refuses_commands_not_on_the_list(argv):
 
 def test_allowlist_accepts_slice1_commands():
     allow = slice1_allowlist()
-    assert allow.match(["git", "clone", "https://github.com/x/y.git", "y"]) == ["y"]
+    assert allow.match(["git", "clone", "--", "https://github.com/x/y.git", "y"]) == ["y"]
     assert allow.match(["git", "status", "--porcelain=v2", "--branch"]) == []
     assert allow.match(["gh", "pr", "list", "--state", "open", "--json", "number,title"]) == []
 
@@ -80,7 +80,7 @@ def test_runner_refuses_before_executing(ws, monkeypatch):
     with pytest.raises(GuardError):
         runner.run(["git", "push", "--force"], ws)
     with pytest.raises(GuardError):
-        runner.run(["git", "clone", "https://github.com/x/y.git", "../outside"], ws)
+        runner.run(["git", "clone", "--", "https://github.com/x/y.git", "../outside"], ws)
     with pytest.raises(GuardError):
         runner.run(["git", "status", "--porcelain=v2", "--branch"], ws.parent)
 
