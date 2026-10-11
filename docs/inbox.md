@@ -11,3 +11,5 @@ Ideas and tangents, one line each. Reviewed when choosing the next bet.
 | 2026-10-10 | Daily brief agent | Demo Loop candidates |
 | 2026-10-10 | Home project planner agent | Demo Loop candidates |
 | 2026-10-10 | Process: slim AGENTS.md to a bootstrap; add docs/principles (SCM, toolchains, architecture, SDLC), operating process with on-demand skills, quick guide | PR #2 comment |
+| 2026-10-11 | `mafx wt new/ls/rm` worktree commands (spec parked in .handoffs/parked/h004) | session |
+| 2026-10-11 | Dedicated Architect and Tech Lead agents (today Claude in Cowork plays both roles) | bet 002 requirements |
