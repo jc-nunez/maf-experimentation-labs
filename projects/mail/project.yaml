@@ -1,0 +1,23 @@
+# Project manifest — the source of truth for mafx and the shared hosts. See docs/manifest.md.
+name: mail
+description: "Mail organizer: triage outlook.com mail (read-only), bet 001"
+status: incubating
+tags: [mail, bet-001]
+python_package: mail_agent
+
+components:
+  agents:
+    - name: triage
+      description: Groups recent outlook.com mail by sender and classifies it into buckets (read-only)
+      runtime: python
+      entry: mail_agent.agents.triage:create_agent
+      tools: [mail-digest]
+
+  tools:
+    - name: mail-digest
+      description: Read-only digest of recent inbox mail, grouped by sender (Microsoft Graph, Mail.Read)
+      kind: function
+      runtime: python
+      entry: mail_agent.tools.mail_digest:mail_digest
+
+  workflows: []
