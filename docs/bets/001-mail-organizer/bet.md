@@ -32,7 +32,7 @@ cleanup and filing happen with my approval; the report is waiting every morning.
 ## Slices
 | # | Slice | Demo | Depends on | Status |
 |---|---|---|---|---|
-| 1 | Triage report, outlook.com, read-only | `mafx run mail/triage -p "last 7 days"` → buckets + top senders | none | spec ([s01.md](s01.md)) |
+| 1 | Triage report, outlook.com, read-only | `mafx run mail/triage -p "last 7 days"` → buckets + top senders | none | demo pending ([s01.md](s01.md)) |
 | 2 | Bulk cleanup with approval | "archive everything from these senders" → approve → done in seconds | 1 | |
 | 3 | Filing rules | agent proposes inbox rules from history; on approval they are created server-side | 1 | |
 | 4 | One view | gmail, yahoo, hotmail and the fourth personal account in one report | 1 | |
