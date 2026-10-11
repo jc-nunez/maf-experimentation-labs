@@ -12,6 +12,7 @@ components:
       runtime: python
       entry: mail_agent.agents.triage:create_agent
       tools: [mail-digest]
+      reasoning_effort: low       # classification over a compact digest; little thinking needed
 
   tools:
     - name: mail-digest
