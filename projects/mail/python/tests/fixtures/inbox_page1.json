@@ -1,0 +1,33 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/mailFolders('inbox')/messages(from,subject,receivedDateTime,isRead,bodyPreview,inferenceClassification)",
+  "value": [
+    {
+      "id": "m1",
+      "receivedDateTime": "2026-10-10T14:02:00Z",
+      "subject": "Your order has shipped",
+      "bodyPreview": "Hi Jean,\r\n  your order #1234 is on its way and should arrive Tuesday.",
+      "isRead": false,
+      "inferenceClassification": "other",
+      "from": {"emailAddress": {"name": "Shop", "address": "Orders@Shop.example"}}
+    },
+    {
+      "id": "m2",
+      "receivedDateTime": "2026-10-10T09:15:00Z",
+      "subject": "Dinner on Saturday?",
+      "bodyPreview": "Are you free on Saturday evening? Let me know by Thursday.",
+      "isRead": false,
+      "inferenceClassification": "focused",
+      "from": {"emailAddress": {"name": "Ana", "address": "ana@friends.example"}}
+    },
+    {
+      "id": "m3",
+      "receivedDateTime": "2026-10-09T18:40:00Z",
+      "subject": "Receipt for your payment",
+      "bodyPreview": "Thanks for your payment of $42.00.",
+      "isRead": true,
+      "inferenceClassification": "other",
+      "from": {"emailAddress": {"name": "", "address": "orders@shop.example"}}
+    }
+  ],
+  "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?%24skip=3&%24top=100"
+}

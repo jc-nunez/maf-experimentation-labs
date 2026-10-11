@@ -1,0 +1,22 @@
+{
+  "value": [
+    {
+      "id": "m4",
+      "receivedDateTime": "2026-10-08T07:00:00Z",
+      "subject": "Weekly digest",
+      "bodyPreview": "Top stories this week",
+      "isRead": false,
+      "inferenceClassification": "other",
+      "from": {"emailAddress": {"name": "News", "address": "digest@news.example"}}
+    },
+    {
+      "id": "m5",
+      "receivedDateTime": "2026-10-05T12:30:00Z",
+      "subject": "Another shipment",
+      "bodyPreview": "Your second order is on its way.",
+      "isRead": true,
+      "inferenceClassification": "other",
+      "from": {"emailAddress": {"name": "Shop", "address": "orders@shop.example"}}
+    }
+  ]
+}
