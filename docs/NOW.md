@@ -6,10 +6,10 @@ Last updated: 2026-10-10
 
 ```
  BET 001  Mail organizer                       status: active
- SLICE 1  Triage report · outlook.com · read-only   status: spec
+ SLICE 1  Triage report · outlook.com · read-only   status: demo pending
  DEMO     mafx run mail/triage -p "last 7 days"
           → table: needs me · newsletters · receipts · noise · top senders
- NEXT     commit docs, merge PR, worktree bet/001-s01-mail-triage, run s01 prompt in Claude Code
+ NEXT     Jean: app registration (s01.md setup), then run the demo
 ```
 
 | Bet | File |
