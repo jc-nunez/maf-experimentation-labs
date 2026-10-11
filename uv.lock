@@ -2664,10 +2664,14 @@ version = "0.1.0"
 source = { editable = "projects/repo-agent/python" }
 dependencies = [
     { name = "maf-labs-host" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "maf-labs-host", editable = "libs/python/maf_labs_host" }]
+requires-dist = [
+    { name = "maf-labs-host", editable = "libs/python/maf_labs_host" },
+    { name = "pyyaml", specifier = ">=6" },
+]
 
 [[package]]
 name = "requests"
