@@ -32,6 +32,8 @@ Cowork writes tasks for Claude Code into a queue shared by all worktrees: `<main
 (gitignored). One handoff = one branch = one worktree. Jean runs `/handoff [id]` in Claude Code
 (`.claude/commands/handoff.md`); Claude Code claims it, executes, fills the Report, sets the status and moves it to
 `.handoffs/done/`. Parallel handoffs must not overlap in `touches:` paths; at most 3 in progress at once.
+Roles: `docs/process/roles.md`. Cycle commands (Claude Code, main checkout): `/sync-docs` → `/wt-new hNNN` → (in the worktree) `/handoff hNNN` → merge →
+`/wt-done hNNN`.
 
 ## Commits
 [Conventional Commits 1.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<scope>): <summary>`
