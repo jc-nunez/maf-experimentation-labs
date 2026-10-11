@@ -3,10 +3,15 @@ name = "repo-agent"
 version = "0.1.0"
 description = "Repo agent: mafx workspace, read-only status, MCP server for Cowork (bet 002)"
 requires-python = ">=3.10"
-dependencies = ["maf-labs-host", "pyyaml>=6"]
+dependencies = [
+    "maf-labs-host",
+    "mcp>=1.9",
+    "pyyaml>=6",
+]
 
 [project.scripts]
 repo-agent = "repo_agent.__main__:main"
+repo-agent-mcp = "repo_agent.mcp_server:main"
 
 [tool.uv.sources]
 maf-labs-host = { workspace = true }
