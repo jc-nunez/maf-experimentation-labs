@@ -11,7 +11,14 @@ components:
       description: Answers questions about the mafx workspace (repos, worktrees, handoffs, PRs); read-only
       runtime: python
       entry: repo_agent.agents.agent:create_agent
-      tools: []
+      tools: [workspace-status]
+      reasoning_effort: low       # reads one tool result and shows a table
 
-  tools: []
+  tools:
+    - name: workspace-status
+      description: Read-only status of a workspace (repos, worktrees, handoff queue, open PRs)
+      kind: function
+      runtime: python
+      entry: repo_agent.tools.workspace_status:workspace_status
+
   workflows: []
