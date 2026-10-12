@@ -46,6 +46,15 @@ def test_translator_merges_streamed_function_call_arguments():
     assert tr.tool_calls == 1
 
 
+def test_translator_strips_leading_whitespace_of_the_reply():
+    tr = UpdateTranslator()
+    events = []
+    for piece in ["\n\n", "  \n", "Hello", "\n\nworld  "]:
+        events += tr.translate(AgentResponseUpdate(contents=[Content.from_text(text=piece)]))
+    assert [e["text"] for e in events] == ["Hello", "\n\nworld  "]
+    assert tr.text == "Hello\n\nworld  "
+
+
 def test_sglang_requires_base_url(monkeypatch):
     monkeypatch.delenv("SGLANG_BASE_URL", raising=False)
     with pytest.raises(ProviderConfigError, match="SGLANG_BASE_URL"):

@@ -193,18 +193,23 @@ def _handoffs(guard: PathGuard, queue: Path) -> list[dict[str, Any]]:
         return []
     items = []
     for file in sorted(guard.check(queue).glob("h*.md")):
-        text = guard.check(file).read_text(encoding="utf-8", errors="replace")
-        match = _FRONTMATTER.match(text)
-        meta = {}
-        if match:
-            for line in match.group(1).splitlines():
-                key, _, value = line.partition(":")
-                meta[key.strip()] = value.split("#", 1)[0].strip()
-        title = next((line[2:].strip() for line in text.splitlines() if line.startswith("# ")), "")
-        items.append(
-            {"id": meta.get("id") or file.stem.split("-", 1)[0], "status": meta.get("status", "?"), "title": title}
-        )
+        meta = read_handoff(guard.check(file))
+        items.append({"id": meta["id"], "status": meta.get("status", "?"), "title": meta["title"]})
     return items
+
+
+def read_handoff(file: Path) -> dict[str, str]:
+    """Frontmatter fields of a handoff (comments after ``#`` dropped), plus ``id`` and ``title`` always set."""
+    text = file.read_text(encoding="utf-8", errors="replace")
+    match = _FRONTMATTER.match(text)
+    meta: dict[str, str] = {}
+    if match:
+        for line in match.group(1).splitlines():
+            key, _, value = line.partition(":")
+            meta[key.strip()] = value.split("#", 1)[0].strip()
+    meta["id"] = meta.get("id") or file.stem.split("-", 1)[0]
+    meta["title"] = next((line[2:].strip() for line in text.splitlines() if line.startswith("# ")), "")
+    return meta
 
 
 def _open_prs(runner: Runner, path: Path, url: str) -> tuple[list[dict[str, Any]], str | None]:
@@ -222,6 +227,14 @@ def _open_prs(runner: Runner, path: Path, url: str) -> tuple[list[dict[str, Any]
 def _home(path: str) -> str:
     home = str(Path.home())
     return "~" + path[len(home) :] if path == home or path.startswith(home + "/") else path
+
+
+TITLE_WIDTH = 60
+
+
+def _cut(text: str, width: int = TITLE_WIDTH) -> str:
+    """At most ``width`` characters; a cut title ends with '…'."""
+    return text if len(text) <= width else text[: width - 1].rstrip() + "…"
 
 
 def format_status(status: dict[str, Any]) -> str:
@@ -259,7 +272,7 @@ def format_status(status: dict[str, Any]) -> str:
     )
     rows.append(("HANDOFFS", [f"{prefix(h)}{h['id']} {h['status']}" for h in status["handoffs"]] or ["none"]))
     prs = [
-        f"{prefix(p)}#{p['number']} {p['headRefName']}  {p['title']}" + ("  (draft)" if p.get("isDraft") else "")
+        f"{prefix(p)}#{p['number']} {p['headRefName']}  {_cut(p['title'])}" + ("  (draft)" if p.get("isDraft") else "")
         for p in status["prs"]
     ]
     rows.append(("PRS", prs or ["none open"]))

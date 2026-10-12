@@ -51,7 +51,23 @@ class PathGuard:
 URL = "{url}"
 PATH = "{path}"
 FIELDS = "{fields}"
+BRANCH = "{branch}"
+RANGE = "{range}"
 _FIELDS = re.compile(r"^[A-Za-z]+(,[A-Za-z]+)*$")
+# Slash-separated parts of letters, digits, '.', '_', '-'; every part starts with a letter or digit, so a branch is
+# never an option ('-x'), an absolute path ('/x'), a hidden or parent folder ('.x', '..') or a range ('a..b').
+_BRANCH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$")
+
+
+def is_branch(name: str) -> bool:
+    """A plain branch name (see ``_BRANCH``), also valid for ``git check-ref-format --branch``."""
+    return len(name) <= 200 and bool(_BRANCH.match(name)) and ".." not in name and not name.endswith((".", ".lock"))
+
+
+def _is_range(token: str) -> bool:
+    """Only ``origin/<branch>..<branch>`` with the same branch on both sides (commits not pushed yet)."""
+    remote, sep, local = token.partition("..")
+    return bool(sep) and is_branch(local) and remote == f"origin/{local}"
 
 
 @dataclass(frozen=True)
@@ -59,7 +75,8 @@ class Allowlist:
     """Exact argv patterns. A command runs only if it matches one pattern token by token.
 
     ``{url}`` accepts a URL with one of ``url_schemes``; ``{path}`` accepts a path (checked by the PathGuard);
-    ``{fields}`` accepts a comma-separated list of field names. No pattern contains a force flag.
+    ``{fields}`` accepts a comma-separated list of field names; ``{branch}`` a branch name (``is_branch``);
+    ``{range}`` only ``origin/<branch>..<branch>``. No pattern contains a force flag.
     """
 
     patterns: tuple[tuple[str, ...], ...]
@@ -88,6 +105,12 @@ class Allowlist:
             elif expected == FIELDS:
                 if not _FIELDS.match(token):
                     return None
+            elif expected == BRANCH:
+                if not is_branch(token):
+                    return None
+            elif expected == RANGE:
+                if not _is_range(token):
+                    return None
             elif expected != token:
                 return None
         return paths
@@ -99,6 +122,16 @@ DEFAULT_PATTERNS: tuple[tuple[str, ...], ...] = (
     ("git", "worktree", "list", "--porcelain"),
     ("git", "log", "-1", "--format=%h %cs %s"),
     ("gh", "pr", "list", "--state", "open", "--json", FIELDS),
+    # Worktree start / finish. Removal and branch deletion only in their safe forms: no --force, no -D.
+    ("git", "fetch", "origin", "--prune"),
+    ("git", "worktree", "add", PATH, "-b", BRANCH, "origin/main"),
+    ("git", "worktree", "add", PATH, BRANCH),
+    ("git", "worktree", "remove", PATH),
+    ("git", "branch", "-d", BRANCH),
+    ("git", "merge-base", "--is-ancestor", BRANCH, "origin/main"),
+    ("git", "rev-parse", "--verify", "--quiet", BRANCH),
+    ("git", "rev-list", "--count", RANGE),
+    ("uv", "sync", "--all-packages"),
 )
 
 
