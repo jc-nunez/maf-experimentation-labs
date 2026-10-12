@@ -172,3 +172,40 @@ def test_finish_refuses_a_missing_or_foreign_worktree(ws, finish):
     (ws / "worktrees" / "h900").mkdir()
     with pytest.raises(WorktreeError, match="not a git worktree"):
         finish()
+
+
+# ------------------------------------------------------------------------------------------- link safety
+
+
+def test_start_refuses_a_symlinked_handoff(ws, start):
+    queue = ws / "labs" / ".handoffs"
+    queue.mkdir()
+    real = ws / "labs" / "h900.txt"
+    real.write_text("---\nid: h900\nstatus: ready\nbranch: test/h900-demo\n---\n")
+    (queue / "h900-demo.md").symlink_to(real)
+
+    with pytest.raises(WorktreeError, match="symbolic link"):
+        start()
+
+
+def test_start_never_overwrites_an_env_the_branch_tracks(ws, start):
+    labs = ws / "labs"
+    git("checkout", "-q", "-b", "test/h900-demo", cwd=labs)
+    (labs / ".env").unlink()
+    (labs / ".env").symlink_to(labs / "README.md")
+    git("add", "-f", ".env", cwd=labs)
+    git("commit", "-q", "-m", "tracked env link", cwd=labs)
+    git("checkout", "-q", "main", cwd=labs)
+    (labs / ".env").write_text("MAF_PROVIDER=mock\n")
+    write_handoff(labs)
+
+    result = start()
+
+    assert "the worktree already has one" in result["warnings"][0]
+    assert (labs / "README.md").read_text() == "labs\n"
+
+
+def test_start_copies_env_readable_by_the_owner_only(ws, start):
+    write_handoff(ws / "labs")
+    start()
+    assert (ws / "worktrees" / "h900" / ".env").stat().st_mode & 0o777 == 0o600

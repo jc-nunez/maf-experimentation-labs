@@ -3,12 +3,15 @@
 Both functions check every precondition before the first write and raise ``WorktreeError`` with the reason when one
 fails. Every write is logged in ``.repo-agent/actions.jsonl``. Nothing is ever forced: a dirty or unpushed worktree is
 refused, and branches are deleted only with ``git branch -d`` (git refuses unmerged ones itself).
+
+``uv sync`` builds the branch's own packages, so it runs that branch's build code: start only handoffs you trust
+(the user approves every call). File operations never follow a symbolic link.
 """
 
 from __future__ import annotations
 
+import os
 import re
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -84,7 +87,10 @@ def _find_handoff(ctx: _Ctx, repos: list[Path], handoff_id: str, folder: str = "
         queue = repo / QUEUE / folder
         if queue.is_dir():
             files = [*queue.glob(f"{handoff_id}-*.md"), *queue.glob(f"{handoff_id}.md")]
-            found += [(repo, ctx.guard.check(f)) for f in files]
+            for f in files:
+                if f.is_symlink():  # move and read the queue entry itself, never what a link points at
+                    raise WorktreeError(f"{f} is a symbolic link; replace it with the handoff file")
+                found.append((repo, ctx.guard.check(f)))
     if len(found) > 1:
         raise WorktreeError(f"{handoff_id} is ambiguous: {', '.join(str(f) for _, f in found)}")
     return found[0] if found else None
@@ -142,10 +148,9 @@ def start_worktree(
         ctx.changes.append(f"worktree {path} on new branch {branch} from origin/main")
 
     warnings = []
-    env = repo / ".env"
-    if env.is_file():
-        shutil.copy2(ctx.guard.check(env), ctx.guard.check(path / ".env"))
-        ctx.changes.append("copied .env")
+    copied = _copy_env(ctx, repo / ".env", path / ".env")
+    if copied:
+        (ctx.changes if copied == "copied .env" else warnings).append(copied)
     if (path / "pyproject.toml").is_file():
         result = ctx.run(["uv", "sync", "--all-packages"], path)
         if result.ok:
@@ -234,15 +239,33 @@ def _owner(ctx: _Ctx, repos: list[Path], path: Path) -> tuple[Path, str]:
     raise WorktreeError(f"{path} is not a git worktree of this workspace; remove it by hand")
 
 
+def _copy_env(ctx: _Ctx, source: Path, target: Path) -> str | None:
+    """Copy the main checkout's ``.env`` into a new worktree: never through a link, never over an existing file
+    (a branch may track its own ``.env``), readable by the owner only."""
+    if not source.is_file():
+        return None
+    if source.is_symlink():
+        return ".env not copied: the main checkout's .env is a symbolic link"
+    if target.exists() or target.is_symlink():
+        return ".env not copied: the worktree already has one"
+    data = ctx.guard.check(source).read_bytes()
+    fd = os.open(ctx.guard.check(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+    return "copied .env"
+
+
 def _move_to_done(ctx: _Ctx, repos: list[Path], handoff_id: str) -> str | None:
     found = _find_handoff(ctx, repos, handoff_id)
     if found is None:  # already in done/ (the /handoff command moves it) or never queued
         return None
     _, file = found
+    if (file.parent / DONE).is_symlink():
+        raise WorktreeError(f"{file.parent / DONE} is a symbolic link; move {file.name} by hand")
     done = ctx.guard.check(file.parent / DONE)
     done.mkdir(exist_ok=True)
     target = ctx.guard.check(done / file.name)
-    if target.exists():
+    if target.exists() or target.is_symlink():
         raise WorktreeError(f"{target} already exists; move {file.name} by hand")
     file.rename(target)
     return f"moved {file.name} to {QUEUE}/{DONE}/"
