@@ -202,15 +202,15 @@ def finish_worktree(
     if merged.returncode not in (0, 1):
         ctx.must(merged.argv, repo)  # a real error, not an answer: log and raise it
     if merged.ok:
+        move = _done_target(ctx, repos, handoff_id)  # refuse a done/ collision before the first write
         ctx.must(["git", "worktree", "remove", str(path)], repo)
         ctx.changes.append(f"removed {path}")
         deleted = ctx.run(["git", "branch", "-d", branch], repo)
         warnings = [] if deleted.ok else [f"branch {branch} kept: {deleted.stderr.strip()}"]
         if deleted.ok:
             ctx.changes.append(f"deleted branch {branch} (merged into origin/main)")
-        moved = _move_to_done(ctx, repos, handoff_id)
-        if moved:
-            ctx.changes.append(moved)
+        if move:
+            ctx.changes.append(_move_to_done(ctx, *move))
         ctx.write_log("finished: " + "; ".join(ctx.changes + warnings))
         return _finished(ctx, handoff_id, branch, path, "merged", warnings)
 
@@ -255,18 +255,22 @@ def _copy_env(ctx: _Ctx, source: Path, target: Path) -> str | None:
     return "copied .env"
 
 
-def _move_to_done(ctx: _Ctx, repos: list[Path], handoff_id: str) -> str | None:
+def _done_target(ctx: _Ctx, repos: list[Path], handoff_id: str) -> tuple[Path, Path] | None:
+    """(handoff file, its path in ``done/``) after every check, without writing; None if there is nothing to move."""
     found = _find_handoff(ctx, repos, handoff_id)
     if found is None:  # already in done/ (the /handoff command moves it) or never queued
         return None
     _, file = found
     if (file.parent / DONE).is_symlink():
         raise WorktreeError(f"{file.parent / DONE} is a symbolic link; move {file.name} by hand")
-    done = ctx.guard.check(file.parent / DONE)
-    done.mkdir(exist_ok=True)
-    target = ctx.guard.check(done / file.name)
+    target = ctx.guard.check(file.parent / DONE / file.name)
     if target.exists() or target.is_symlink():
         raise WorktreeError(f"{target} already exists; move {file.name} by hand")
+    return file, target
+
+
+def _move_to_done(ctx: _Ctx, file: Path, target: Path) -> str:
+    ctx.guard.check(target.parent).mkdir(exist_ok=True)
     file.rename(target)
     return f"moved {file.name} to {QUEUE}/{DONE}/"
 

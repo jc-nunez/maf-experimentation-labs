@@ -174,6 +174,22 @@ def test_finish_refuses_a_missing_or_foreign_worktree(ws, finish):
         finish()
 
 
+def test_finish_refuses_a_done_collision_before_any_write(ws, start, finish):
+    file = write_handoff(ws / "labs")
+    start()
+    (ws / "labs" / ".handoffs" / "done").mkdir()
+    (ws / "labs" / ".handoffs" / "done" / file.name).write_text("older copy\n")
+    before = actions(ws)
+
+    with pytest.raises(WorktreeError, match="already exists; move h900-demo.md by hand"):
+        finish()
+
+    assert (ws / "worktrees" / "h900").is_dir()
+    assert git("branch", "--list", "test/h900-demo", cwd=ws / "labs").endswith("test/h900-demo")
+    assert file.exists()
+    assert actions(ws) == before
+
+
 # ------------------------------------------------------------------------------------------- link safety
 
 
