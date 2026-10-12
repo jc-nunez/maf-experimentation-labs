@@ -145,9 +145,11 @@ class UpdateTranslator:
                 if content.text:
                     out.append(self._ev(REASONING, text=content.text))
             elif ctype == "text":
-                if content.text:
-                    self.text_parts.append(content.text)
-                    out.append(self._ev(TEXT, text=content.text))
+                # Models often open a reply with blank lines; drop leading whitespace until the first visible text.
+                text = content.text if self.text_parts else (content.text or "").lstrip()
+                if text:
+                    self.text_parts.append(text)
+                    out.append(self._ev(TEXT, text=text))
             elif ctype == "function_result":
                 started = self._call_started.pop(content.call_id or "", None)
                 duration = round(time.perf_counter() - started, 3) if started else None
