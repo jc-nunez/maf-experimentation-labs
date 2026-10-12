@@ -1,7 +1,8 @@
 """repo-agent MCP server (stdio) for the Claude desktop app, Claude Code and other MCP clients.
 
 Tools:
-- ``create_workspace`` [write]: deterministic code, approved with the client's standard tool approval.
+- ``create_workspace``, ``start_worktree``, ``finish_worktree`` [write]: deterministic code, approved with the
+  client's standard tool approval.
 - ``workspace_status`` [read]: deterministic code; works without a model.
 - ``ask_repo_agent`` [read]: one question to the ``reader`` agent on the host's provider (local Qwen). It only has
   read tools, so no write is reachable from a question.
@@ -20,7 +21,7 @@ from maf_labs_host.workspace import load_env
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from repo_agent import workspace
+from repo_agent import workspace, worktree
 from repo_agent.guards import Allowlist
 
 PROJECT_DIR = Path(__file__).resolve().parents[3]
@@ -28,11 +29,14 @@ PROJECT_DIR = Path(__file__).resolve().parents[3]
 INSTRUCTIONS = """\
 repo-agent manages the user's workspaces under ~/workspaces/<project>/ (main checkouts, worktrees, handoff queue).
 Use workspace_status for status, ask_repo_agent for questions, and create_workspace only when the user wants a new
-workspace. Show the status table exactly as returned.
+workspace. start_worktree / finish_worktree start and finish a handoff's worktree (worktrees/<handoff id>); call
+them only when the user asks for that handoff. Show tool results exactly as returned.
 """
 
 READ = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True)
+START = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=True)
+FINISH = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=True)
 
 
 def build_server(
@@ -60,6 +64,39 @@ def build_server(
         if result["status"] == "unchanged":
             return f"{result['workspace']}: {result['message']}"
         return f"{result['workspace']}: {result['status']}\n" + "\n".join(f"- {c}" for c in result["changes"])
+
+    @server.tool(
+        description=(
+            "Start a handoff: create ~/workspaces/<project>/worktrees/<handoff_id> on the handoff's branch (new from "
+            "origin/main, or the existing branch), copy .env, run uv sync. Only for a handoff with status ready; "
+            "refuses when the main checkout is dirty or the worktree exists. Returns what changed and the command "
+            "that starts the handoff in Claude Code."
+        ),
+        annotations=START,
+    )
+    def start_worktree(handoff_id: str, project: str = "mafx") -> str:
+        try:
+            return worktree.format_result(
+                worktree.start_worktree(handoff_id, project, caller="mcp", allowlist=allowlist)
+            )
+        except (PermissionError, worktree.WorktreeError) as e:
+            return f"refused: {e}"
+
+    @server.tool(
+        description=(
+            "Finish a handoff: remove worktrees/<handoff_id> when it is clean. Branch merged into origin/main: delete "
+            "it (git branch -d) and move the handoff to .handoffs/done/. Not merged but fully pushed: keep the "
+            "branch. Anything else: refuse and change nothing. Never forces."
+        ),
+        annotations=FINISH,
+    )
+    def finish_worktree(handoff_id: str, project: str = "mafx") -> str:
+        try:
+            return worktree.format_result(
+                worktree.finish_worktree(handoff_id, project, caller="mcp", allowlist=allowlist)
+            )
+        except (PermissionError, worktree.WorktreeError) as e:
+            return f"refused: {e}"
 
     @server.tool(
         description=(

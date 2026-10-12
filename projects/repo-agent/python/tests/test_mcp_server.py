@@ -17,11 +17,13 @@ def text(result) -> str:
     return "".join(c.text for c in result.content if c.type == "text")
 
 
-async def test_lists_three_tools_with_read_and_write_hints(server):
+async def test_lists_five_tools_with_read_and_write_hints(server):
     async with Client(server) as client:
         tools = {t.name: t for t in (await client.list_tools()).tools}
-    assert set(tools) == {"create_workspace", "workspace_status", "ask_repo_agent"}
-    assert tools["create_workspace"].annotations.read_only_hint is False
+    assert set(tools) == {"create_workspace", "start_worktree", "finish_worktree", "workspace_status", "ask_repo_agent"}
+    for name in ("create_workspace", "start_worktree", "finish_worktree"):
+        assert tools[name].annotations.read_only_hint is False
+    assert tools["finish_worktree"].annotations.destructive_hint is True
     assert tools["workspace_status"].annotations.read_only_hint is True
     assert tools["ask_repo_agent"].annotations.read_only_hint is True
 
@@ -65,3 +67,25 @@ async def test_ask_repo_agent_uses_a_reader_with_only_read_tools(monkeypatch):
     await runner.close()
     assert host_tools == {"workspace_status"}
     assert not own_tools & {"create_workspace", "start_worktree", "finish_worktree"}
+
+
+async def test_start_and_finish_a_worktree(server, root):
+    async with Client(server) as client:
+        await client.call_tool("create_workspace", {"project": "mafx"})
+        labs = root.resolve() / "mafx" / "labs"
+        (labs / ".git" / "info" / "exclude").write_text(".handoffs/\n")
+        (labs / ".handoffs").mkdir()
+        (labs / ".handoffs" / "h003-mail.md").write_text("---\nstatus: draft\nbranch: bet/001-s02\n---\n")
+        (labs / ".handoffs" / "h900-demo.md").write_text("---\nstatus: ready\nbranch: test/h900-demo\n---\n")
+
+        draft = text(await client.call_tool("start_worktree", {"handoff_id": "h003"}))
+        started = text(await client.call_tool("start_worktree", {"handoff_id": "h900"}))
+        status = text(await client.call_tool("workspace_status", {"project": "mafx"}))
+        finished = text(await client.call_tool("finish_worktree", {"handoff_id": "h900"}))
+
+    path = root.resolve() / "mafx" / "worktrees" / "h900"
+    assert draft == "refused: h003 is draft, not ready"
+    assert started.startswith(f"h900: started ({path})") and started.endswith(f'cd {path} && claude "/handoff h900"')
+    assert "test/h900-demo" in status
+    assert "deleted branch test/h900-demo" in finished and "moved h900-demo.md to .handoffs/done/" in finished
+    assert not path.exists()
