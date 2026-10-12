@@ -1,6 +1,6 @@
 # Project manifest — the source of truth for mafx and the shared hosts. See docs/manifest.md.
 name: repo-agent
-description: "Repo agent: creates workspaces and reports their status, over mafx and MCP"
+description: "Repo agent: workspaces, their status and handoff worktrees, over mafx and MCP"
 status: incubating
 tags: [repo, git]
 python_package: repo_agent
@@ -8,11 +8,17 @@ python_package: repo_agent
 components:
   agents:
     - name: agent
-      description: Answers questions about the mafx workspace (repos, worktrees, handoffs, PRs); read-only
+      description: Workspace status, and starting / finishing handoff worktrees (every write asks for approval)
       runtime: python
       entry: repo_agent.agents.agent:create_agent
+      tools: [workspace-status, start-worktree, finish-worktree]
+      reasoning_effort: low       # one tool call, then shows its result
+    - name: reader
+      description: Read-only agent behind the ask_repo_agent MCP tool; status and questions only
+      runtime: python
+      entry: repo_agent.agents.agent:create_reader
       tools: [workspace-status]
-      reasoning_effort: low       # reads one tool result and shows a table
+      reasoning_effort: low
 
   tools:
     - name: workspace-status
@@ -20,5 +26,15 @@ components:
       kind: function
       runtime: python
       entry: repo_agent.tools.workspace_status:workspace_status
+    - name: start-worktree
+      description: "Write (approval): create worktrees/<handoff id> on the handoff's branch, copy .env, uv sync"
+      kind: function
+      runtime: python
+      entry: repo_agent.tools.worktree:start_worktree
+    - name: finish-worktree
+      description: "Write (approval): remove a clean worktree; delete its branch if merged, keep it if pushed"
+      kind: function
+      runtime: python
+      entry: repo_agent.tools.worktree:finish_worktree
 
   workflows: []

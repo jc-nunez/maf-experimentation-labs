@@ -3,8 +3,8 @@
 Tools:
 - ``create_workspace`` [write]: deterministic code, approved with the client's standard tool approval.
 - ``workspace_status`` [read]: deterministic code; works without a model.
-- ``ask_repo_agent`` [read]: one question to the harness agent on the host's provider (local Qwen). The agent
-  only has read tools, so no write is reachable from a question.
+- ``ask_repo_agent`` [read]: one question to the ``reader`` agent on the host's provider (local Qwen). It only has
+  read tools, so no write is reachable from a question.
 
 stdout carries the MCP protocol; everything else goes to stderr. Console script: ``repo-agent-mcp``.
 """
@@ -88,10 +88,10 @@ def build_server(
 
 
 async def ask(message: str) -> str:
-    """Run one turn of the agent on the host's provider and return its answer."""
+    """Run one turn of the read-only ``reader`` agent on the host's provider and return its answer."""
     project = load_project(PROJECT_DIR)
     load_env(find_workspace(PROJECT_DIR), PROJECT_DIR)
-    runner = create_runner(project, "agent")
+    runner = create_runner(project, "reader")  # read tools only: a question can never reach a write
     await runner.start()
     try:
         events = await collect(runner.turn(message))

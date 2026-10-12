@@ -56,12 +56,12 @@ async def test_ask_repo_agent_cannot_reach_a_write(server, root):
     assert not (root / "mafx").exists()
 
 
-async def test_agent_has_only_read_tools(monkeypatch):
+async def test_ask_repo_agent_uses_a_reader_with_only_read_tools(monkeypatch):
     monkeypatch.setenv("MAF_PROVIDER", "mock")
-    runner = create_runner(load_project(PROJECT_DIR), "agent")
+    runner = create_runner(load_project(PROJECT_DIR), "reader")
     await runner.start()
     host_tools = {t.name for t in runner.tools}
     own_tools = {getattr(t, "name", "") for t in runner.agent.default_options.get("tools") or []}
     await runner.close()
     assert host_tools == {"workspace_status"}
-    assert not own_tools & {"create_workspace", "clone_repo", "workspace_init"}
+    assert not own_tools & {"create_workspace", "start_worktree", "finish_worktree"}
