@@ -1,8 +1,7 @@
 # repo-agent
 
-Repo agent ([bet 002](../../docs/bets/002-repo-agent/bet.md), slice 1). Creates the workspace
-`~/workspaces/mafx/` and reports its status: repos, worktrees, handoff queue, open PRs. The only write is
-`create_workspace`; everything else reads.
+Creates the workspace `~/workspaces/mafx/` and reports its status: repos, worktrees, handoff queue, open PRs.
+The only write is `create_workspace`; everything else reads.
 
 | Component | Runtime | What it does |
 |---|---|---|
@@ -26,7 +25,7 @@ Repo agent ([bet 002](../../docs/bets/002-repo-agent/bet.md), slice 1). Creates 
   .repo-agent/actions.jsonl            # one line per write: time, caller, tool, argv, result
 ```
 Guards (in code, not prompts): every path must be inside `~/workspaces/<project>/`; a command runs only if its argv
-matches the slice 1 allowlist exactly (`git clone -- <https url> <path>`, `git status --porcelain=v2 --branch`,
+matches the default allowlist exactly (`git clone -- <https url> <path>`, `git status --porcelain=v2 --branch`,
 `git worktree list --porcelain`, `git log -1 --format=…`, `gh pr list --state open --json …`).
 
 ## Register in the Claude desktop app (once)
