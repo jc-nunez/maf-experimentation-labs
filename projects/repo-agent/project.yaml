@@ -1,0 +1,24 @@
+# Project manifest — the source of truth for mafx and the shared hosts. See docs/manifest.md.
+name: repo-agent
+description: "Repo agent: creates workspaces and reports their status, over mafx and MCP"
+status: incubating
+tags: [repo, git]
+python_package: repo_agent
+
+components:
+  agents:
+    - name: agent
+      description: Answers questions about the mafx workspace (repos, worktrees, handoffs, PRs); read-only
+      runtime: python
+      entry: repo_agent.agents.agent:create_agent
+      tools: [workspace-status]
+      reasoning_effort: low       # reads one tool result and shows a table
+
+  tools:
+    - name: workspace-status
+      description: Read-only status of a workspace (repos, worktrees, handoff queue, open PRs)
+      kind: function
+      runtime: python
+      entry: repo_agent.tools.workspace_status:workspace_status
+
+  workflows: []
