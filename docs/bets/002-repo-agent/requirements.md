@@ -31,7 +31,7 @@ Captured from Jean. No design until this file is `approved`.
 | R6 | Reports PR and handoff queue status | Must |
 | R7 | v1: Cowork (Tech Lead) reaches repo-agent through a local MCP server run by the Claude desktop app; writes use Cowork's standard tool approval | Must |
 | R7b | The same MCP server registered in Claude Code, Codex and other MCP-capable CLIs | Later |
-| R8 | Interactive session on local Qwen (`mafx run repo/agent`) | Must |
+| R8 | Interactive session on local Qwen (`mafx run repo-agent/agent`) | Must |
 | R9 | One inventory across MacBook Pro, Windows PC and DGX Spark (private GitHub registry) | Later |
 
 ## Boundaries
