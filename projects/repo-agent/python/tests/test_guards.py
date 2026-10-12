@@ -94,7 +94,30 @@ def test_allowlist_accepts_default_commands():
     assert allow.match(["uv", "sync", "--all-packages"]) == []
 
 
-@pytest.mark.parametrize("name", ["-D", "--force", "a..b", "", "a b", "a;b", "a~1", "a^", "a:b"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "-D",
+        "--force",
+        "a..b",
+        "",
+        "a b",
+        "a;b",
+        "a~1",
+        "a^",
+        "a:b",
+        "/etc",
+        ".git",
+        "a//b",
+        "a/",
+        "a/.x",
+        "a/-x",
+        "a.lock",
+        "a.",
+        "@{-1}",
+        "x" * 201,
+    ],
+)
 def test_is_branch_refuses_options_ranges_and_odd_characters(name):
     assert not is_branch(name)
 

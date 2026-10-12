@@ -54,12 +54,14 @@ FIELDS = "{fields}"
 BRANCH = "{branch}"
 RANGE = "{range}"
 _FIELDS = re.compile(r"^[A-Za-z]+(,[A-Za-z]+)*$")
-_BRANCH = re.compile(r"^[A-Za-z0-9._/][A-Za-z0-9._/-]*$")
+# Slash-separated parts of letters, digits, '.', '_', '-'; every part starts with a letter or digit, so a branch is
+# never an option ('-x'), an absolute path ('/x'), a hidden or parent folder ('.x', '..') or a range ('a..b').
+_BRANCH = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$")
 
 
 def is_branch(name: str) -> bool:
-    """A branch name: letters, digits, ``._/-``; no leading ``-`` (never an option) and no ``..`` (never a range)."""
-    return bool(_BRANCH.match(name)) and ".." not in name
+    """A plain branch name (see ``_BRANCH``), also valid for ``git check-ref-format --branch``."""
+    return len(name) <= 200 and bool(_BRANCH.match(name)) and ".." not in name and not name.endswith((".", ".lock"))
 
 
 def _is_range(token: str) -> bool:
