@@ -27,7 +27,7 @@ def start_worktree(handoff_id: HandoffId, project: Project = "mafx") -> str:
     try:
         return worktree.format_result(worktree.start_worktree(handoff_id, project, caller="agent"))
     except (PermissionError, worktree.WorktreeError) as e:
-        return f"refused: {e}"
+        return worktree.format_error(e)
 
 
 @tool(
@@ -43,4 +43,4 @@ def finish_worktree(handoff_id: HandoffId, project: Project = "mafx") -> str:
     try:
         return worktree.format_result(worktree.finish_worktree(handoff_id, project, caller="agent"))
     except (PermissionError, worktree.WorktreeError) as e:
-        return f"refused: {e}"
+        return worktree.format_error(e)

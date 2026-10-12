@@ -80,7 +80,7 @@ def build_server(
                 worktree.start_worktree(handoff_id, project, caller="mcp", allowlist=allowlist)
             )
         except (PermissionError, worktree.WorktreeError) as e:
-            return f"refused: {e}"
+            return worktree.format_error(e)
 
     @server.tool(
         description=(
@@ -96,7 +96,7 @@ def build_server(
                 worktree.finish_worktree(handoff_id, project, caller="mcp", allowlist=allowlist)
             )
         except (PermissionError, worktree.WorktreeError) as e:
-            return f"refused: {e}"
+            return worktree.format_error(e)
 
     @server.tool(
         description=(

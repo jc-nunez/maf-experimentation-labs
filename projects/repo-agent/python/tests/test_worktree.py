@@ -3,6 +3,7 @@
 import subprocess
 
 import pytest
+from repo_agent import worktree
 from repo_agent.guards import ActionLog
 from repo_agent.workspace import create_workspace, workspace_status
 from repo_agent.worktree import WorktreeError, finish_worktree, start_worktree
@@ -188,6 +189,50 @@ def test_finish_refuses_a_done_collision_before_any_write(ws, start, finish):
     assert git("branch", "--list", "test/h900-demo", cwd=ws / "labs").endswith("test/h900-demo")
     assert file.exists()
     assert actions(ws) == before
+
+
+def test_finish_error_after_a_write_is_logged_and_reported(ws, start, finish, monkeypatch):
+    write_handoff(ws / "labs")
+    start()
+
+    def broken(*args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(worktree, "_move_to_done", broken)
+
+    with pytest.raises(WorktreeError, match=r"^failed after writes: removed .*h900; deleted branch .*; disk full$"):
+        finish()
+
+    entry = actions(ws)[-1]
+    assert entry["tool"] == "finish_worktree" and entry["result"].startswith("failed after: removed")
+    assert ["git", "worktree", "remove", str(ws / "worktrees" / "h900")] in entry["argv"]
+
+
+def test_start_error_after_a_write_is_logged_and_reported(ws, start, monkeypatch):
+    write_handoff(ws / "labs")
+
+    def broken(*args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(worktree, "_copy_env", broken)
+
+    with pytest.raises(WorktreeError, match=r"^failed after writes: worktree .*h900 on new branch .*; disk full$"):
+        start()
+
+    entry = actions(ws)[-1]
+    assert entry["tool"] == "start_worktree" and entry["result"].startswith("failed after: worktree")
+
+
+@pytest.mark.parametrize(
+    ("error", "reply"),
+    [
+        (WorktreeError("h900 is draft, not ready"), "refused: h900 is draft, not ready"),
+        (PermissionError("outside the workspace"), "refused: outside the workspace"),
+        (worktree.FailedAfterWrites(["removed x"], "boom"), "failed after writes: removed x; boom"),
+    ],
+)
+def test_format_error_never_calls_a_partial_write_refused(error, reply):
+    assert worktree.format_error(error) == reply
 
 
 # ------------------------------------------------------------------------------------------- link safety
