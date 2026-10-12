@@ -1,10 +1,10 @@
-"""Path guard (A6), command allowlist (A7) and action log."""
+"""Path guard, command allowlist and action log."""
 
 import subprocess
 
 import pytest
 from repo_agent.git import Runner
-from repo_agent.guards import ActionLog, GuardError, PathGuard, slice1_allowlist, workspace_dir
+from repo_agent.guards import ActionLog, GuardError, PathGuard, default_allowlist, workspace_dir
 
 
 @pytest.fixture
@@ -61,11 +61,11 @@ def test_workspace_dir_uses_env_root(tmp_path, monkeypatch):
 )
 def test_allowlist_refuses_commands_not_on_the_list(argv):
     with pytest.raises(GuardError):
-        slice1_allowlist().match(argv)
+        default_allowlist().match(argv)
 
 
-def test_allowlist_accepts_slice1_commands():
-    allow = slice1_allowlist()
+def test_allowlist_accepts_default_commands():
+    allow = default_allowlist()
     assert allow.match(["git", "clone", "--", "https://github.com/x/y.git", "y"]) == ["y"]
     assert allow.match(["git", "status", "--porcelain=v2", "--branch"]) == []
     assert allow.match(["gh", "pr", "list", "--state", "open", "--json", "number,title"]) == []
@@ -76,7 +76,7 @@ def test_runner_refuses_before_executing(ws, monkeypatch):
         raise AssertionError("subprocess must not run")
 
     monkeypatch.setattr(subprocess, "run", boom)
-    runner = Runner(PathGuard(ws), slice1_allowlist())
+    runner = Runner(PathGuard(ws), default_allowlist())
     with pytest.raises(GuardError):
         runner.run(["git", "push", "--force"], ws)
     with pytest.raises(GuardError):
@@ -87,7 +87,7 @@ def test_runner_refuses_before_executing(ws, monkeypatch):
 
 def test_runner_runs_allowlisted_command(ws):
     subprocess.run(["git", "init", "-q", str(ws)], check=True)
-    result = Runner(PathGuard(ws), slice1_allowlist()).run(["git", "status", "--porcelain=v2", "--branch"], ws)
+    result = Runner(PathGuard(ws), default_allowlist()).run(["git", "status", "--porcelain=v2", "--branch"], ws)
     assert result.ok and "# branch.head" in result.stdout
 
 

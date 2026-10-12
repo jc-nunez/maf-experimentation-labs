@@ -1,4 +1,4 @@
-"""MCP server in-process: the 3 tools (A3), and ask_repo_agent reaching only read tools (A5)."""
+"""MCP server in-process: the three tools, and ask_repo_agent reaching only read tools."""
 
 import pytest
 from maf_labs_host import create_runner

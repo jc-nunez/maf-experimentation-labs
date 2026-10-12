@@ -93,7 +93,7 @@ class Allowlist:
         return paths
 
 
-SLICE1_PATTERNS: tuple[tuple[str, ...], ...] = (
+DEFAULT_PATTERNS: tuple[tuple[str, ...], ...] = (
     ("git", "clone", "--", URL, PATH),
     ("git", "status", "--porcelain=v2", "--branch"),
     ("git", "worktree", "list", "--porcelain"),
@@ -102,8 +102,8 @@ SLICE1_PATTERNS: tuple[tuple[str, ...], ...] = (
 )
 
 
-def slice1_allowlist(url_schemes: tuple[str, ...] = ("https",)) -> Allowlist:
-    return Allowlist(SLICE1_PATTERNS, url_schemes)
+def default_allowlist(url_schemes: tuple[str, ...] = ("https",)) -> Allowlist:
+    return Allowlist(DEFAULT_PATTERNS, url_schemes)
 
 
 class ActionLog:

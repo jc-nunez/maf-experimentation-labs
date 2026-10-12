@@ -1,8 +1,8 @@
 # Project manifest — the source of truth for mafx and the shared hosts. See docs/manifest.md.
 name: repo-agent
-description: "Repo agent: mafx workspace, read-only status, MCP server for Cowork (bet 002)"
+description: "Repo agent: creates workspaces and reports their status, over mafx and MCP"
 status: incubating
-tags: [repo, bet-002]
+tags: [repo, git]
 python_package: repo_agent
 
 components:

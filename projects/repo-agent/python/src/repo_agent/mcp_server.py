@@ -1,4 +1,4 @@
-"""repo-agent MCP server (stdio) for the Claude desktop app (Cowork), Claude Code and other MCP clients.
+"""repo-agent MCP server (stdio) for the Claude desktop app, Claude Code and other MCP clients.
 
 Tools:
 - ``create_workspace`` [write]: deterministic code, approved with the client's standard tool approval.
@@ -46,7 +46,7 @@ def build_server(
         description=(
             "Create the workspace ~/workspaces/<project>/: clone its repos on their default branch, an empty "
             "worktrees/ folder and .repo-agent/ (config and action log). Idempotent: when everything exists it "
-            "changes nothing and says so. Slice 1 knows the project 'mafx'."
+            "changes nothing and says so. Known projects: " + ", ".join(known_repos) + "."
         ),
         annotations=WRITE,
     )

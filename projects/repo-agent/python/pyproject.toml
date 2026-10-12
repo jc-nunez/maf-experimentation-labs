@@ -1,7 +1,7 @@
 [project]
 name = "repo-agent"
 version = "0.1.0"
-description = "Repo agent: mafx workspace, read-only status, MCP server for Cowork (bet 002)"
+description = "Repo agent: creates workspaces and reports their status, over mafx and MCP"
 requires-python = ">=3.10"
 dependencies = [
     "maf-labs-host",

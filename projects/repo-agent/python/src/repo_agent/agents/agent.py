@@ -1,4 +1,4 @@
-"""Repo agent on the Agent Framework harness. Read-only in slice 1: its only tools are read tools and skills.
+"""Repo agent on the Agent Framework harness. Read-only: its only tools are read tools and skills.
 
 The host attaches the manifest tools (workspace_status). Writes are never tools of this agent: they are separate,
 approved MCP tools (see mcp_server.py), so a model cannot reach them from a question.
@@ -10,7 +10,7 @@ from agent_framework import SkillsProvider, create_harness_agent
 
 INSTRUCTIONS = """\
 You are repo-agent. You know the user's workspaces under ~/workspaces/<project>/: the main checkouts, their
-worktrees, the handoff queue and open pull requests. In this version you only read; you never change anything.
+worktrees, the handoff queue and open pull requests. You only read; you never change anything.
 
 Follow the skill that fits the request (load it first). If no skill fits, say what you can do: show a workspace's
 status and answer questions about it.

@@ -1,6 +1,6 @@
 """Workspaces: ``~/workspaces/<project>/`` with the main checkouts, ``worktrees/`` and ``.repo-agent/``.
 
-``create_workspace`` is the only write in slice 1; ``workspace_status`` and ``format_status`` are read-only.
+``create_workspace`` writes; ``workspace_status`` and ``format_status`` only read.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import Any
 import yaml
 
 from repo_agent.git import Runner
-from repo_agent.guards import ActionLog, Allowlist, GuardError, PathGuard, slice1_allowlist, workspace_dir
+from repo_agent.guards import ActionLog, Allowlist, GuardError, PathGuard, default_allowlist, workspace_dir
 
 STATE_DIR = ".repo-agent"
 CONFIG = "config.yaml"
@@ -68,7 +68,7 @@ def create_workspace(
     """Create the workspace folders, write the config and clone missing repos. Idempotent."""
     ws = workspace_dir(project, root)
     guard = PathGuard(ws)
-    runner = Runner(guard, allowlist or slice1_allowlist())
+    runner = Runner(guard, allowlist or default_allowlist())
     existed = ws.is_dir()
 
     config = load_config(ws) or {"project": project, "repos": []}
@@ -124,7 +124,7 @@ def workspace_status(project: str = "mafx", *, root: Path | None = None) -> dict
     if config is None:
         return {"project": project, "workspace": str(ws), "exists": False}
     guard = PathGuard(ws)
-    runner = Runner(guard, slice1_allowlist())
+    runner = Runner(guard, default_allowlist())
     status: dict[str, Any] = {
         "project": project,
         "workspace": str(ws),
@@ -225,7 +225,7 @@ def _home(path: str) -> str:
 
 
 def format_status(status: dict[str, Any]) -> str:
-    """The status table shown by Cowork, the MCP tool and the mafx agent."""
+    """The status table shown by the MCP tool and the agent."""
     if not status.get("exists"):
         return f" WORKSPACE  {_home(status['workspace'])}  (not created yet: call create_workspace)"
     rows: list[tuple[str, list[str]]] = [("WORKSPACE", [_home(status["workspace"])])]

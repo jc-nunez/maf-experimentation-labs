@@ -1,4 +1,4 @@
-"""workspace_status tool, and the agent showing the same status on the mock provider (A4)."""
+"""workspace_status tool, and the agent showing the same status on the mock provider."""
 
 from pathlib import Path
 

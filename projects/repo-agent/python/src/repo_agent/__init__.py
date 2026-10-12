@@ -1,1 +1,1 @@
-"""repo-agent: Repo agent: mafx workspace, read-only status, MCP server for Cowork (bet 002)"""
+"""repo-agent: Repo agent: creates workspaces and reports their status, over mafx and MCP"""

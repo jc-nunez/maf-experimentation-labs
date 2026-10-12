@@ -3,7 +3,7 @@
 import subprocess
 
 import pytest
-from repo_agent.guards import slice1_allowlist
+from repo_agent.guards import default_allowlist
 
 GIT_ENV = {
     "GIT_AUTHOR_NAME": "test",
@@ -52,5 +52,5 @@ def repos(origin):
 
 @pytest.fixture
 def file_allowlist():
-    """The slice 1 allowlist, also accepting file:// URLs so tests can clone the local bare origin."""
-    return slice1_allowlist(("https", "file"))
+    """The default allowlist, also accepting file:// URLs so tests can clone the local bare origin."""
+    return default_allowlist(("https", "file"))

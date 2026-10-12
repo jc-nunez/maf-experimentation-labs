@@ -1,4 +1,4 @@
-"""create_workspace (A1, A2) and workspace_status / format_status on temp dirs with a bare origin (A8)."""
+"""create_workspace, workspace_status and format_status on temp dirs with a bare origin."""
 
 import subprocess
 
