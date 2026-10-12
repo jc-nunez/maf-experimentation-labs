@@ -1,4 +1,4 @@
-"""The only way repo-agent runs git or gh: allowlist check, path guard, then subprocess without a shell."""
+"""The only way repo-agent runs git, gh or uv: allowlist check, path guard, then subprocess without a shell."""
 
 from __future__ import annotations
 
@@ -44,6 +44,8 @@ class Runner:
             "GH_PROMPT_DISABLED": "1",
             "GIT_ALLOW_PROTOCOL": ":".join(self.allowlist.url_schemes),
         }
+        # uv sync in a worktree must use that worktree's .venv, not the environment this process runs in.
+        env.pop("VIRTUAL_ENV", None)
         try:
             proc = subprocess.run(
                 argv, cwd=workdir, env=env, capture_output=True, text=True, timeout=TIMEOUT_SECONDS, check=False
