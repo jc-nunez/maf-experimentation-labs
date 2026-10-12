@@ -14,3 +14,4 @@ Ideas and tangents, one line each. Reviewed when choosing the next bet.
 | 2026-10-11 | `mafx wt new/ls/rm` worktree commands (spec parked in .handoffs/parked/h004) | session |
 | 2026-10-11 | Dedicated Architect and Tech Lead agents (today Claude in Cowork plays both roles) | bet 002 requirements |
 | 2026-10-12 | Edit-tool eval for local Qwen: search/replace vs hashline vs full rewrite (open hashline benchmark), with normalization + stale checks | research: best code-editing tools for agents |
+| 2026-10-11 | refactor(mail): drop plan references (bet 001, slice 1) from `project.yaml`, `pyproject.toml`, `mail_agent/__init__.py`, `README.md` | session |
