@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 from repo_agent.git import Runner
-from repo_agent.guards import ActionLog, GuardError, PathGuard, default_allowlist, workspace_dir
+from repo_agent.guards import ActionLog, GuardError, PathGuard, default_allowlist, is_branch, workspace_dir
 
 
 @pytest.fixture
@@ -57,6 +57,21 @@ def test_workspace_dir_uses_env_root(tmp_path, monkeypatch):
         ["gh", "pr", "merge", "1"],
         ["gh", "pr", "list", "--state", "open", "--json", "number;rm -rf"],
         ["rm", "-rf", "/"],
+        ["git", "worktree", "remove", "--force", "worktrees/h1"],
+        ["git", "worktree", "remove", "-f", "worktrees/h1"],
+        ["git", "worktree", "add", "--force", "worktrees/h1", "b"],
+        ["git", "worktree", "add", "worktrees/h1", "-B", "b", "origin/main"],
+        ["git", "worktree", "add", "worktrees/h1", "--detach"],
+        ["git", "branch", "-D", "b"],
+        ["git", "branch", "-d", "--force", "b"],
+        ["git", "branch", "-d", "-f"],
+        ["git", "fetch", "origin", "--prune", "--force"],
+        ["git", "rev-parse", "--verify", "--quiet", "a..b"],
+        ["git", "rev-list", "--count", "main..b"],
+        ["git", "rev-list", "--count", "origin/a..b"],
+        ["git", "rev-list", "--count", "origin/b...b"],
+        ["uv", "sync"],
+        ["uv", "run", "anything"],
     ],
 )
 def test_allowlist_refuses_commands_not_on_the_list(argv):
@@ -69,6 +84,19 @@ def test_allowlist_accepts_default_commands():
     assert allow.match(["git", "clone", "--", "https://github.com/x/y.git", "y"]) == ["y"]
     assert allow.match(["git", "status", "--porcelain=v2", "--branch"]) == []
     assert allow.match(["gh", "pr", "list", "--state", "open", "--json", "number,title"]) == []
+    assert allow.match(["git", "worktree", "add", "worktrees/h1", "-b", "bet/002-s02", "origin/main"]) == [
+        "worktrees/h1"
+    ]
+    assert allow.match(["git", "worktree", "add", "worktrees/h1", "bet/002-s02"]) == ["worktrees/h1"]
+    assert allow.match(["git", "worktree", "remove", "worktrees/h1"]) == ["worktrees/h1"]
+    assert allow.match(["git", "branch", "-d", "bet/002-s02"]) == []
+    assert allow.match(["git", "rev-list", "--count", "origin/bet/x..bet/x"]) == []
+    assert allow.match(["uv", "sync", "--all-packages"]) == []
+
+
+@pytest.mark.parametrize("name", ["-D", "--force", "a..b", "", "a b", "a;b", "a~1", "a^", "a:b"])
+def test_is_branch_refuses_options_ranges_and_odd_characters(name):
+    assert not is_branch(name)
 
 
 def test_runner_refuses_before_executing(ws, monkeypatch):
