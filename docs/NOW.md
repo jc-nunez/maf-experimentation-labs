@@ -7,7 +7,7 @@ Last updated: 2026-10-12
 ```
  BET 002  Repo agent       ● active   slice 1 ✓ done · slice 2 (worktree start/finish) → design
  BET 001  Mail organizer   ⏸ paused   s01 shipped + demoed · s02 spec kept (h003 draft)
- NEXT     Tech Lead: write slice 2 design (+ P1, P2 polish, R26 planning worktree) → Jean's gate
+ NEXT     Jean: commit planning + PR + merge → h007 ready → worktree h007 → /handoff h007
 ```
 Priority switch (Jean, 2026-10-11): the repo agent first, because it frees time for design. Back to one active bet.
 Roles and floors: [process/roles.md](process/roles.md)

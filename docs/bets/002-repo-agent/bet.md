@@ -36,7 +36,7 @@ From any tool (Cowork, Claude Code, Codex) or `mafx run repo-agent/agent`, I ask
 | # | Slice | Demo | Depends on | Status |
 |---|---|---|---|---|
 | 1 | Create `~/workspaces/mafx/` + read-only status (mafx + MCP) | Cowork creates the workspace (approved) and shows status; `mafx run repo-agent/agent -p "status"` shows the same | none | ✓ done 2026-10-12 ([s01.md](s01.md)) |
-| 2 | Worktree start / finish | "start h00N" → approve → worktree ready; "finish" after merge | 1 | |
+| 2 | Worktree start / finish | "start h00N" → approve → worktree ready; "finish" after merge | 1 | approved ([s02.md](s02.md)) |
 | 3 | Sync main | "sync" → approve → main pulled, merged branches and prunable worktrees cleaned | 1 | |
 | 4 | Push + PR | Builder commits; repo-agent pushes and opens the PR; Builder rules updated | 2 | |
 
