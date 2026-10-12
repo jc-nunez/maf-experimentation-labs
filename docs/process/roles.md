@@ -5,7 +5,7 @@
 | Owner | Jean | decisions, approvals, PR review and merge, demo | |
 | Tech Lead + Architect (planner) | Claude (Cowork) | shape, slice, design, specs, handoffs; needs to know what exists in the workspace | git, code |
 | Builder | Claude Code | implements a handoff in its worktree and commits its work | push, PRs, merge, work outside `touches:` |
-| Repo agent | MAF harness agent, local Qwen (`mafx run repo/agent`), reachable over MCP | the only role for PRs, clones, branch sync, worktrees, inventory, references; serves the Tech Lead | code, merge, force-push, history rewrite |
+| Repo agent | MAF harness agent, local Qwen (`mafx run repo-agent/agent`), reachable over MCP | the only role for PRs, clones, branch sync, worktrees, inventory, references; serves the Tech Lead | code, merge, force-push, history rewrite |
 | Mail assistant | MAF harness agent, local Qwen (`mafx run mail/assistant`) | Jean's mailboxes | |
 
 ```

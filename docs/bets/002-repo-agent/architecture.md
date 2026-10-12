@@ -9,7 +9,7 @@ requirements: requirements.md (v1)
 ```
  ┌──────────── MacBook Pro (macOS, native) ───────────────────────────────────────────────────┐
  │                                                                                            │
- │  Jean ── terminal ── mafx run repo/agent ──┐                                                │
+ │  Jean ── terminal ── mafx run repo-agent/agent ──┐                                                │
  │                                            │                                                │
  │  Cowork ── Claude desktop app ── MCP ──────┤  (stdio, launched by the desktop app)          │
  │  (Tech Lead)   ask_repo_agent(message)     │                                                │
