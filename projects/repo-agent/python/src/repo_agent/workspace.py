@@ -229,6 +229,14 @@ def _home(path: str) -> str:
     return "~" + path[len(home) :] if path == home or path.startswith(home + "/") else path
 
 
+TITLE_WIDTH = 60
+
+
+def _cut(text: str, width: int = TITLE_WIDTH) -> str:
+    """At most ``width`` characters; a cut title ends with '…'."""
+    return text if len(text) <= width else text[: width - 1].rstrip() + "…"
+
+
 def format_status(status: dict[str, Any]) -> str:
     """The status table shown by the MCP tool and the agent."""
     if not status.get("exists"):
@@ -264,7 +272,7 @@ def format_status(status: dict[str, Any]) -> str:
     )
     rows.append(("HANDOFFS", [f"{prefix(h)}{h['id']} {h['status']}" for h in status["handoffs"]] or ["none"]))
     prs = [
-        f"{prefix(p)}#{p['number']} {p['headRefName']}  {p['title']}" + ("  (draft)" if p.get("isDraft") else "")
+        f"{prefix(p)}#{p['number']} {p['headRefName']}  {_cut(p['title'])}" + ("  (draft)" if p.get("isDraft") else "")
         for p in status["prs"]
     ]
     rows.append(("PRS", prs or ["none open"]))

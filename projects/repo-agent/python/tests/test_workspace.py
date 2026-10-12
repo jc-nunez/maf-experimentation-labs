@@ -95,3 +95,25 @@ def test_status_of_a_missing_workspace(root):
     status = workspace_status("mafx")
     assert status["exists"] is False
     assert "not created yet" in format_status(status)
+
+
+def test_format_status_cuts_long_pr_titles():
+    long_title = "feat(repo-agent): add start_worktree and finish_worktree with every precondition"
+    status = {
+        "exists": True,
+        "workspace": "/tmp/ws",
+        "repos": [],
+        "worktrees": [],
+        "handoffs": [],
+        "prs": [
+            {"repo": "labs", "number": 7, "headRefName": "bet/x", "title": long_title, "isDraft": False},
+            {"repo": "labs", "number": 8, "headRefName": "bet/y", "title": "short", "isDraft": True},
+        ],
+        "errors": [],
+    }
+
+    prs = [line for line in format_status(status).splitlines() if "#" in line]
+
+    title = prs[0].split("bet/x  ", 1)[1]
+    assert len(title) == 60 and title.endswith("…") and long_title.startswith(title[:-1])
+    assert prs[1].endswith("#8 bet/y  short  (draft)")
