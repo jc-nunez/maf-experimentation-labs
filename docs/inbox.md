@@ -13,3 +13,4 @@ Ideas and tangents, one line each. Reviewed when choosing the next bet.
 | 2026-10-10 | Process: slim AGENTS.md to a bootstrap; add docs/principles (SCM, toolchains, architecture, SDLC), operating process with on-demand skills, quick guide | PR #2 comment |
 | 2026-10-11 | `mafx wt new/ls/rm` worktree commands (spec parked in .handoffs/parked/h004) | session |
 | 2026-10-11 | Dedicated Architect and Tech Lead agents (today Claude in Cowork plays both roles) | bet 002 requirements |
+| 2026-10-12 | Edit-tool eval for local Qwen: search/replace vs hashline vs full rewrite (open hashline benchmark), with normalization + stale checks | research: best code-editing tools for agents |
