@@ -1,7 +1,8 @@
 """Worktree start / finish for a handoff: ``<workspace>/worktrees/<handoff id>`` on the handoff's branch.
 
 Both functions check every precondition before the first write and raise ``WorktreeError`` with the reason when one
-fails. Every write is logged in ``.repo-agent/actions.jsonl``. Nothing is ever forced: a dirty or unpushed worktree is
+fails. An error after a write raises ``FailedAfterWrites``, which lists what changed. Every write, and every failure
+after one, is logged in ``.repo-agent/actions.jsonl``. Nothing is ever forced: a dirty or unpushed worktree is
 refused, and branches are deleted only with ``git branch -d`` (git refuses unmerged ones itself).
 
 ``uv sync`` builds the branch's own packages, so it runs that branch's build code: start only handoffs you trust
@@ -12,6 +13,8 @@ from __future__ import annotations
 
 import os
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -27,6 +30,14 @@ DONE = "done"
 
 class WorktreeError(RuntimeError):
     """A precondition failed or a git step failed; the message says which."""
+
+
+class FailedAfterWrites(WorktreeError):
+    """An error after at least one write: the message lists what changed, so it is never reported as refused."""
+
+    def __init__(self, changes: list[str], error: str) -> None:
+        self.changes = list(changes)
+        super().__init__(f"failed after writes: {'; '.join(changes)}; {error}")
 
 
 @dataclass
@@ -47,13 +58,26 @@ class _Ctx:
         return self.runner.run(argv, cwd)
 
     def must(self, argv: list[str], cwd: Path) -> Result:
-        """Run a step that has to succeed; a failure is logged with everything done so far, then raised."""
+        """Run a step that has to succeed; a failure is logged with the commands run so far, then raised. After a
+        write, ``writes()`` logs it instead, with the changes."""
         result = self.run(argv, cwd)
         if not result.ok:
             reason = result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"
-            self.write_log(f"failed at '{' '.join(argv)}': {reason}")
+            if not self.changes:
+                self.write_log(f"failed at '{' '.join(argv)}': {reason}")
             raise WorktreeError(f"'{' '.join(argv)}' failed: {reason}")
         return result
+
+    @contextmanager
+    def writes(self) -> Iterator[None]:
+        """Wrap the steps that write: an error once something changed is logged and raised as ``FailedAfterWrites``."""
+        try:
+            yield
+        except Exception as e:
+            if not self.changes:
+                raise
+            self.write_log(f"failed after: {'; '.join(self.changes)}; {e}")
+            raise FailedAfterWrites(self.changes, str(e)) from e
 
     def write_log(self, result: str) -> None:
         self.log.append(caller=self.caller, tool=self.tool, argv=self.commands, result=result)
@@ -140,23 +164,24 @@ def start_worktree(
         raise WorktreeError(f"{path} already exists")
 
     ctx.must(["git", "fetch", "origin", "--prune"], repo)
-    if _ref_exists(ctx, repo, f"refs/heads/{branch}") or _ref_exists(ctx, repo, f"refs/remotes/origin/{branch}"):
-        ctx.must(["git", "worktree", "add", str(path), branch], repo)
-        ctx.changes.append(f"worktree {path} on existing branch {branch}")
-    else:
-        ctx.must(["git", "worktree", "add", str(path), "-b", branch, "origin/main"], repo)
-        ctx.changes.append(f"worktree {path} on new branch {branch} from origin/main")
-
     warnings = []
-    copied = _copy_env(ctx, repo / ".env", path / ".env")
-    if copied:
-        (ctx.changes if copied == "copied .env" else warnings).append(copied)
-    if (path / "pyproject.toml").is_file():
-        result = ctx.run(["uv", "sync", "--all-packages"], path)
-        if result.ok:
-            ctx.changes.append("uv sync done")
-        else:  # the worktree is usable; the agent in it can sync again
-            warnings.append(f"uv sync failed: {(result.stderr.strip().splitlines() or ['?'])[-1]}")
+    with ctx.writes():
+        if _ref_exists(ctx, repo, f"refs/heads/{branch}") or _ref_exists(ctx, repo, f"refs/remotes/origin/{branch}"):
+            ctx.must(["git", "worktree", "add", str(path), branch], repo)
+            ctx.changes.append(f"worktree {path} on existing branch {branch}")
+        else:
+            ctx.must(["git", "worktree", "add", str(path), "-b", branch, "origin/main"], repo)
+            ctx.changes.append(f"worktree {path} on new branch {branch} from origin/main")
+
+        copied = _copy_env(ctx, repo / ".env", path / ".env")
+        if copied:
+            (ctx.changes if copied == "copied .env" else warnings).append(copied)
+        if (path / "pyproject.toml").is_file():
+            result = ctx.run(["uv", "sync", "--all-packages"], path)
+            if result.ok:
+                ctx.changes.append("uv sync done")
+            else:  # the worktree is usable; the agent in it can sync again
+                warnings.append(f"uv sync failed: {(result.stderr.strip().splitlines() or ['?'])[-1]}")
 
     ctx.write_log("started: " + "; ".join(ctx.changes + warnings))
     return {
@@ -202,15 +227,16 @@ def finish_worktree(
     if merged.returncode not in (0, 1):
         ctx.must(merged.argv, repo)  # a real error, not an answer: log and raise it
     if merged.ok:
-        ctx.must(["git", "worktree", "remove", str(path)], repo)
-        ctx.changes.append(f"removed {path}")
-        deleted = ctx.run(["git", "branch", "-d", branch], repo)
-        warnings = [] if deleted.ok else [f"branch {branch} kept: {deleted.stderr.strip()}"]
-        if deleted.ok:
-            ctx.changes.append(f"deleted branch {branch} (merged into origin/main)")
-        moved = _move_to_done(ctx, repos, handoff_id)
-        if moved:
-            ctx.changes.append(moved)
+        move = _done_target(ctx, repos, handoff_id)  # refuse a done/ collision before the first write
+        with ctx.writes():
+            ctx.must(["git", "worktree", "remove", str(path)], repo)
+            ctx.changes.append(f"removed {path}")
+            deleted = ctx.run(["git", "branch", "-d", branch], repo)
+            warnings = [] if deleted.ok else [f"branch {branch} kept: {deleted.stderr.strip()}"]
+            if deleted.ok:
+                ctx.changes.append(f"deleted branch {branch} (merged into origin/main)")
+            if move:
+                ctx.changes.append(_move_to_done(ctx, *move))
         ctx.write_log("finished: " + "; ".join(ctx.changes + warnings))
         return _finished(ctx, handoff_id, branch, path, "merged", warnings)
 
@@ -255,18 +281,22 @@ def _copy_env(ctx: _Ctx, source: Path, target: Path) -> str | None:
     return "copied .env"
 
 
-def _move_to_done(ctx: _Ctx, repos: list[Path], handoff_id: str) -> str | None:
+def _done_target(ctx: _Ctx, repos: list[Path], handoff_id: str) -> tuple[Path, Path] | None:
+    """(handoff file, its path in ``done/``) after every check, without writing; None if there is nothing to move."""
     found = _find_handoff(ctx, repos, handoff_id)
     if found is None:  # already in done/ (the /handoff command moves it) or never queued
         return None
     _, file = found
     if (file.parent / DONE).is_symlink():
         raise WorktreeError(f"{file.parent / DONE} is a symbolic link; move {file.name} by hand")
-    done = ctx.guard.check(file.parent / DONE)
-    done.mkdir(exist_ok=True)
-    target = ctx.guard.check(done / file.name)
+    target = ctx.guard.check(file.parent / DONE / file.name)
     if target.exists() or target.is_symlink():
         raise WorktreeError(f"{target} already exists; move {file.name} by hand")
+    return file, target
+
+
+def _move_to_done(ctx: _Ctx, file: Path, target: Path) -> str:
+    ctx.guard.check(target.parent).mkdir(exist_ok=True)
     file.rename(target)
     return f"moved {file.name} to {QUEUE}/{DONE}/"
 
@@ -281,6 +311,11 @@ def _finished(ctx: _Ctx, handoff_id: str, branch: str, path: Path, how: str, war
         "changes": ctx.changes,
         "warnings": warnings,
     }
+
+
+def format_error(error: Exception) -> str:
+    """The reply for a call that raised: ``refused:`` only when nothing changed."""
+    return str(error) if isinstance(error, FailedAfterWrites) else f"refused: {error}"
 
 
 def format_result(result: dict[str, Any]) -> str:

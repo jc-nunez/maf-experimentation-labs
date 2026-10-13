@@ -13,5 +13,7 @@ description: Finish a handoff whose PR is merged or pushed, for requests such as
 ## Rules
 - A reply that starts with `refused:` changed nothing: show the reason and what would fix it (commit, push or merge
   first), in one line. Do not retry.
+- A reply that starts with `failed after writes:` changed something: list each change it names, then the error,
+  and say what is left to do by hand. Never say "nothing changed". Do not retry.
 - A kept branch is expected when the work is pushed but not merged; say so.
 - Never suggest `--force` or `git branch -D`.
